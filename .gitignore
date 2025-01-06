@@ -32,9 +32,9 @@ models/
 *.pkl
 *.h5
 
-# Jupyter Notebook
-.ipynb_checkpoints
-*.ipynb
+# # Jupyter Notebook
+# .ipynb_checkpoints
+# *.ipynb
 
 # VS Code
 .vscode/
