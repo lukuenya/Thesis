@@ -1,258 +1,210 @@
-import optuna
-import numpy as np
-import pandas as pd
-from sklearn.model_selection import KFold, train_test_split
-from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
-import lightgbm as lgb
-from lightgbm import LGBMRegressor
 import data_loader
-import joblib
 import config
-import re
-import os
+
+import numpy as np
+from functools import partial
+import optuna
+import joblib
+
+from sklearn.model_selection import StratifiedKFold, train_test_split
+from sklearn.metrics import (
+    roc_auc_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    brier_score_loss
+)
+
+from xgboost import XGBClassifier
+from lightgbm import LGBMClassifier
+from catboost import CatBoostClassifier
+
+def get_hyperparameter_space(trial, model_name):
+    """
+    Define hyperparameter search space for each model
+    """
+
+    if model_name == "lightgbm":
+        return {
+            'objective': 'binary',
+            'is_unbalance': True,
+            'metric': 'auc',
+            'n_jobs': -1,
+            'random_state': 42,
+            'verbosity': -1,
+            #'scale_pos_weight': class_weight_ratio,
+
+            'reg_alpha': trial.suggest_float("reg_alpha", 1e-8, 10.0, log=True),
+            'reg_lambda': trial.suggest_float("reg_lambda", 1e-8, 10.0, log=True),
+            'n_estimators': trial.suggest_int('n_estimators', 30, 300),
+            'num_leaves': trial.suggest_int('num_leaves', 100, 500),
+            'max_depth': trial.suggest_int('max_depth', 6, 12),
+            'learning_rate': trial.suggest_float('learning_rate', 1e-3, 1e-1, log=True),
+            'boosting_type': trial.suggest_categorical('boosting_type', ['dart', 'gbdt'])
+        }
+
+    elif model_name == "xgboost":
+        return {
+            'booster': 'dart',
+            'objective': 'binary:logistic',
+            # 'scale_pos_weight': 3.585365,  # Using Fried ratio as it's more imbalanced
+            'max_delta_step': 1,  # Helps with class imbalance
+            'eval_metric': 'auc',
+            'nthreads': -1,
+            'random_state': 42,
+            'verbosity': 0,
+
+            'n_estimators': trial.suggest_int('n_estimators', 50, 300),
+            'alpha': trial.suggest_float('alpha', 1e-3, 10.0, log=True), 
+            'max_depth': trial.suggest_int('max_depth', 3, 10),
+            'eta': trial.suggest_float('eta', 0.01, 0.3, log=True),
+            'min_child_weight': trial.suggest_int('min_child_weight', 0, 120),
+            'subsample': trial.suggest_float('subsample', 0.6, 1.0),
+            'colsample_bytree': trial.suggest_float('colsample_bytree', 0.6, 1.0)
+        }
+
+    elif model_name == "catboost":
+        return {
+            'eval_metric': 'AUC',
+            'random_seed': 42,
+            'thread_count': -1,
+            'verbose': False,
+            'auto_class_weights': 'Balanced',
+            'loss_function': 'Logloss',
+
+            'iterations': trial.suggest_int('iterations', 30, 300),
+            'depth': trial.suggest_int('depth', 4, 12),
+            'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3),
+            'l2_leaf_reg': trial.suggest_float('l2_leaf_reg', 1e-8, 10.0, log=True),
+            'bagging_temperature': trial.suggest_float('bagging_temperature', 0.0, 1.0),
+            'random_strength': trial.suggest_float('random_strength', 1e-8, 10.0, log=True)
+        }
+    else:
+        raise ValueError(f"Unknown model: {model_name}")
 
 
-def clean_name(name):
-    """Clean a single column name to be compatible with LightGBM"""
-    # Replace special characters and spaces with underscore
-    cleaned = re.sub(r'[^A-Za-z0-9_]+', '_', str(name))
-    # Remove leading/trailing underscores
-    cleaned = cleaned.strip('_')
-    # Replace multiple underscores with single underscore
-    cleaned = re.sub(r'_+', '_', cleaned)
-    return cleaned
-
-
-def clean_column_names(df):
-    """Clean column names to be compatible with LightGBM"""
-    df.columns = [clean_name(col) for col in df.columns]
-    return df
-
-
-def get_important_features(X, y, params):
-    """Train a model and return the most important features"""
-    # Remove n_estimators from params if present
-    train_params = params.copy()
-    n_estimators = train_params.pop('n_estimators', 100)
-    
-    # Create a small validation set for early stopping
-    X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
-    train_data = lgb.Dataset(X_train, label=y_train)
-    valid_data = lgb.Dataset(X_val, label=y_val, reference=train_data)
-    
-    # Train model with early stopping
-    model = lgb.train(
-        train_params,
-        train_data,
-        num_boost_round=n_estimators,
-        valid_sets=[train_data, valid_data],
-        valid_names=['train', 'valid'],
-        callbacks=[lgb.early_stopping(stopping_rounds=10, verbose=False)]
-    )
-    
-    # Get feature importance
-    importance = pd.DataFrame({
-        'feature': X.columns,
-        'importance': model.feature_importance(importance_type='gain')
-    })
-    importance = importance.sort_values('importance', ascending=False)
-    
-    # Select top features (those that account for 95% of total importance)
-    total_importance = importance['importance'].sum()
-    cumulative_importance = importance['importance'].cumsum() / total_importance
-    important_features = importance[cumulative_importance <= 0.95]['feature'].tolist()
-    
-    return important_features
-
-
-def objective(trial, X, y, folds, score_type):
-    """Objective function for Optuna optimization"""
-    # Define the hyperparameters to optimize
-    params = {
-        'objective': 'regression',
-        'metric': 'rmse',
-        'boosting_type': 'gbdt',
-        'lambda_l1': trial.suggest_float('lambda_l1', 1e-3, 10.0, log=True),
-        'lambda_l2': trial.suggest_float('lambda_l2', 1e-3, 10.0, log=True),
-        'num_leaves': trial.suggest_int('num_leaves', 20, 40),
-        'feature_fraction': trial.suggest_float('feature_fraction', 0.5, 0.8),
-        'bagging_fraction': trial.suggest_float('bagging_fraction', 0.5, 0.9),
-        'bagging_freq': trial.suggest_int('bagging_freq', 1, 10),
-        'min_child_samples': trial.suggest_int('min_child_samples', 20, 50),
-        'learning_rate': trial.suggest_float('learning_rate', 0.005, 0.05, log=True),
-        'max_depth': trial.suggest_int('max_depth', 5, 8),
-        'verbose': -1
-    }
-    
-    # Get number of estimators separately
-    n_estimators = trial.suggest_int('n_estimators', 300, 800)
-    
-    # Initialize arrays to store scores
-    scores = []
+def objective(trial, x, y, model_name):
+    """Optuna objective function for hyperparameter optimization"""
+    # Get hyperparameters for this trial
+    params = get_hyperparameter_space(trial, model_name)
     
     # Perform k-fold cross validation
-    for fold in range(5):
-        # Get train and validation indices
-        train_idx = folds != fold
-        valid_idx = folds == fold
+    kf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+
+    auc = []
+
+    for idx in kf.split(X=x, y=y):
+        train_idx, valid_idx = idx[0], idx[1]
+        x_train, y_train = x[train_idx], y[train_idx]
+        x_valid, y_valid = x[valid_idx], y[valid_idx]
         
-        # Create datasets using aligned indices
-        train_data = lgb.Dataset(
-            X.loc[train_idx], 
-            label=y.loc[train_idx]
-        )
-        valid_data = lgb.Dataset(
-            X.loc[valid_idx], 
-            label=y.loc[valid_idx],
-            reference=train_data
-        )
+        # Create a new model instance for each fold
+        if model_name == "lightgbm":
+            model = LGBMClassifier(**params)
+        elif model_name == "xgboost":
+            model = XGBClassifier(**params)
+        elif model_name == "catboost":
+            model = CatBoostClassifier(**params)
+            
+        # Train the model
+        model.fit(x_train, y_train)
         
-        # Train model
-        model = lgb.train(
-            params,
-            train_data,
-            num_boost_round=n_estimators,
-            valid_sets=[valid_data],
-            callbacks=[lgb.early_stopping(50)],
-        )
+        # Predict probabilities
+        preds = model.predict_proba(x_valid)[:, 1]
         
-        # Get best score
-        scores.append(model.best_score['valid_0']['rmse'])
+        # Calculate ROC AUC for this fold
+        fold_auc = roc_auc_score(y_valid, preds)
+
+        auc.append(fold_auc)
+
+    mean_auc = np.mean(auc)
+    std_auc = np.std(auc)
+
+    trial.set_user_attr('std_auc', std_auc)
+    trial.set_user_attr('fold_auc_scores', auc)
     
-    # Return mean RMSE
-    return np.mean(scores)
+    # Return mean score across all folds
+    return mean_auc
 
 
-def optimize_model(score_type, n_trials=100):
-    """
-    Optimize LightGBM model using Optuna
-    
-    Parameters:
-    -----------
-    score_type : str
-        'FRIED' or 'FRAGIRE18'
-    n_trials : int
-        Number of optimization trials
-    
-    Returns:
-    --------
-    dict
-        Best parameters and study object
-    """
-    # Load the full dataset with folds
-    df = pd.read_csv(config.TRAINING_FILE_FOLD)
-    initial_rows = len(df)
-    
-    # Clean all column names
-    df = clean_column_names(df)
-    
-    # Update config column names to match cleaned names
-    cleaned_fried_cols = [clean_name(col) for col in config.COLS_TO_DROP_FRIED_SCORE]
-    cleaned_fragire_cols = [clean_name(col) for col in config.COLS_TO_DROP_FRAILTY_SCORE]
-    
-    # Select appropriate fold column and target column based on score type
-    fold_col = f'kfold_{score_type.lower()}'
-    if score_type == 'FRIED':
-        target_col = 'Fried_Score_FRIED_TOTAL_Version_1'
-        cols_to_drop = cleaned_fried_cols + ['Frailty_Score_FRAGIRE18_SQ001']
-    else:  # FRAGIRE18
-        target_col = 'Frailty_Score_FRAGIRE18_SQ001'
-        cols_to_drop = cleaned_fragire_cols + ['Fried_Score_FRIED_TOTAL_Version_1']
-    
-    # Drop rows where target variable is NaN
-    df = df.dropna(subset=[target_col]).reset_index(drop=True)
-    
-    final_rows = len(df)
-    print(f"\nDataset size for {score_type}:")
-    print(f"Initial rows: {initial_rows}")
-    print(f"Rows after dropping NaN targets: {final_rows}")
-    print(f"Dropped rows: {initial_rows - final_rows}")
+def optimize_model(score_type, n_trials, model_name):
+    """Main function to optimize model hyperparameters"""
+    # Load data
+    X, y, feature_names = data_loader.load_data(score_type)
 
-    # Drop unnecessary columns including both fold columns
-    cols_to_drop_all = cols_to_drop + ['kfold_fried', 'kfold_fragire18']
-    features = df.drop(cols_to_drop_all + [target_col], axis=1)
-    
-    # Remove any remaining non-numeric columns
-    X = features.select_dtypes(include=[np.number])
-    y = df[target_col]
-    
-    # Keep track of fold column
-    folds = df[fold_col]
-    
-    # Create initial parameters for feature selection
-    init_params = {
-        'objective': 'regression',
-        'metric': 'rmse',
-        'boosting_type': 'gbdt',
-        'lambda_l1': 0.1,
-        'lambda_l2': 0.1,
-        'num_leaves': 31,
-        'feature_fraction': 0.8,
-        'bagging_fraction': 0.8,
-        'bagging_freq': 5,
-        'min_child_samples': 20,
-        'learning_rate': 0.05,
-        'max_depth': 6,
-        'early_stopping_round': 50,
-        'verbose': -1
-    }
-    
-    # Get important features
-    important_features = get_important_features(X, y, init_params)
-    X = X[important_features]
-    print(f"\nSelected {len(important_features)} important features out of {features.shape[1]} total features")
-    print("\nTop 10 important features:")
-    print("\n".join(important_features[:10]))
-
-    # Create study object
-    study = optuna.create_study(
-        direction="minimize",
+    # Create partial function with fixed parameters
+    optimization_function = partial(
+        objective,
+        x=X,
+        y=y,
+        model_name=model_name
     )
     
-    # Optimize
-    study.optimize(
-        lambda trial: objective(trial, X, y, folds, score_type),
-        n_trials=n_trials
-    )
-    
-    # Get best parameters
-    best_params = study.best_params
-    best_params.update({
-        'objective': 'regression',
-        'metric': 'rmse',
-        'boosting_type': 'gbdt',
-        'verbose': -1
-    })
-    
+    # Create and run study
+    study = optuna.create_study(direction='maximize')
+    study.optimize(optimization_function, n_trials=n_trials)
+
+    # Print the best parameters
+    print(f"Best parameters: {study.best_params}")
+
+    # Print the best score
+    print(f"Best score: {study.best_value:.2f}")
+
+    # Get the standard deviation of the best trial
+    best_trial = study.best_trial
+    std_auc = best_trial.user_attrs['std_auc']
+    print(f"Standard deviation: {std_auc:.2f}")
+
     # Train final model with best parameters
-    final_model = LGBMRegressor(**best_params)
+    best_params = study.best_params
+    if model_name == "lightgbm":
+        final_model = LGBMClassifier(**best_params)
+    elif model_name == "xgboost":
+        final_model = XGBClassifier(**best_params)
+    elif model_name == "catboost":
+        final_model = CatBoostClassifier(**best_params)
+    else:
+        raise ValueError(f"Unknown model: {model_name}")
+        
     final_model.fit(X, y)
-    
+
     # Save the model
-    model_filename = f"lightgbm_{score_type.lower()}_optimized.joblib"
+    model_filename = f"{model_name}_{score_type.lower()}_optimized.joblib"
     joblib.dump(final_model, os.path.join(config.MODEL_OUTPUT, model_filename))
-    
-    # Save study
-    study_filename = f"{score_type.lower()}_study.joblib"
-    joblib.dump(study, os.path.join(config.MODEL_OUTPUT, study_filename))
-    
-    return {
-        'best_params': best_params,
-        'study': study
-    }
+
+    # Save the feature importances
+    feature_importances = final_model.feature_importances_
+    feature_importances_df = pd.DataFrame({'Feature': feature_names, 'Importance': feature_importances})
+    feature_importances_df.to_excel(os.path.join(config.MODEL_OUTPUT, f"{model_name}_{score_type.lower()}_feature_importances.xlsx"), index=False)
 
 
 if __name__ == "__main__":
-    # Run optimization for both scoring systems
-    fried_results = optimize_model('FRIED', n_trials=100)
-    fragire_results = optimize_model('FRAGIRE18', n_trials=100)
+    import argparse
     
-    # Save studies for later analysis
-    joblib.dump(
-        fried_results['study'],
-        os.path.join(config.MODEL_OUTPUT, "fried_study.joblib")
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--score_type",
+        type=str,
+        required=True,
+        choices=["FRIED", "FRAGIRE18"],
+        help="Type of frailty score to predict"
     )
-    joblib.dump(
-        fragire_results['study'],
-        os.path.join(config.MODEL_OUTPUT, "fragire18_study.joblib")
+    parser.add_argument(
+        "--n_trials",
+        type=int,
+        default=15,
+        help="Number of Optuna trials"
     )
+    parser.add_argument(
+        "--model",
+        type=str,
+        required=True,
+        choices=["lightgbm", "xgboost", "catboost"],
+        help="Model to optimize"
+    )
+    
+    args = parser.parse_args()
+
+    optimize_model(score_type=args.score_type, n_trials=args.n_trials, model_name=args.model)
+
+    print("\nOptimization complete!")
