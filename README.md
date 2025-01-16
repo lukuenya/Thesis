@@ -4,7 +4,7 @@ The focus is on understanding the features driving these scores or classes, comp
 For easiness purposes, we will use binary classification problem to predict the FRIED and FRAGIRE18 states of frailty: 0 for healthy and 1 for frail. 
 
 ## Research Objectives
-1. Develop accurate prediction models for both FRIED and FRAGIRE18 frailty score
+1. Develop accurate prediction models for both FRIED and FRAGIRE18 frailty score/class
 2. Compare and contrast these two frailty assessment methods
 3. Identify key features that influence both scoring systems or classification models
 4. Evaluate the clinical applicability and reliability of ML-based frailty assessments
@@ -14,13 +14,17 @@ For easiness purposes, we will use binary classification problem to predict the 
 ## Data Preprocessing
 1. Feature Selection and Engineering
    - Removal of highly correlated features (list in config.py)
-   - Missing values are handled natively by models
+   - Missing values are handled in 'X' are handled natively by models (if applicable) and in 'y' respective rows are dropped.
 
 
 2. Data Splitting
    - Stratified k-fold cross-validation
-   - 80% of the data is used for training
-   - 20% of the data is used for validation
+   - 75% of the data is used for training
+      - 100 samples for FRIED
+      - 108 samples for FRAGIRE18
+   - 25% of the data is used for validation (unseen during training)
+      - 32 samples for FRIED
+      - 36 samples for FRAGIRE18
 
 ## Model Development
 
@@ -41,7 +45,7 @@ For easiness purposes, we will use binary classification problem to predict the 
 ### Hyperparameter Optimization
 - Framework: Optuna
 - Optimization metric: AUC and F1-Score
-- Number of trials: 100
+- Number of trials: 50
 - Cross-validation: 5-fold
 
 ## Validation Framework
@@ -53,37 +57,14 @@ For easiness purposes, we will use binary classification problem to predict the 
    - ROC curve
    - Precision-Recall curve
 
-2. **Bootstrap Confidence Intervals**
-   - Methodology:
-     * 1000 bootstrap samples with replacement
-     * Preserves data distribution
-   - Metrics Computed:
-     * 95% CI 
-     * 
-
-3. **Error Distribution Analysis**
-
-
-4. **Cross-Validation Strategy**
+2. **Cross-Validation Strategy**
    - 5-fold Cross-validation
-     * Stratified by score distribution
+     * Stratified by class distribution
 
 ### Clinical Validation
-
-### Future Enhancements
-Potential areas for extending the validation framework:
-1. Additional Statistical Metrics
-
-
-2. Enhanced Clinical Validation
-   - Prediction confidence scoring
-   - Decision boundary analysis
-   - Systematic bias detection
-
-3. Implementation Considerations
-   - Real-time prediction capability
-   - Integration requirements
-   - Quality assurance protocols
+ - Feature Importance
+ - Correlation Analysis
+ - Expert Evaluation
 
 # PROJECT STRUCTURE
 - `input/`: Input files and data
@@ -97,9 +78,8 @@ Potential areas for extending the validation framework:
   - `data_loader.py`: Data loading
   - `preprocessing.py`: Data preprocessing
 
-- `models/`: Trained models and optimization studies
+- `models/`: Trained models and parameters
   - Saved model states
-  - Optuna study objects
   - Model parameters
 
 - `notebooks/`: Jupyter notebooks
