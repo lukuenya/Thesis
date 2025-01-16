@@ -87,15 +87,15 @@ Potential areas for extending the validation framework:
 
 # PROJECT STRUCTURE
 - `input/`: Input files and data
-  - Training data with fold assignments
-  - Feature descriptions
-  - Score definitions
+      - data_global.xlsx
 
 - `src/`: Python source code
   - `train_optimize.py`: Model training and optimization
   - `get_feature_importances.py`: Feature importance analysis
   - `feature_selection.py`: Feature selection and aggregation
   - `config.py`: Configuration file
+  - `data_loader.py`: Data loading
+  - `preprocessing.py`: Data preprocessing
 
 - `models/`: Trained models and optimization studies
   - Saved model states
