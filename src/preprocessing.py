@@ -15,23 +15,6 @@ def drop_high_missing(df, threshold):
     return df.drop(columns=cols_to_drop)
 
 
-# def drop_near_zero_variance(df, variance_threshold=1e-5):
-#     """
-#     Remove columns with near-zero variance
-#     """
-#     # using sklearn's VarianceThreshold class
-#     selector = VarianceThreshold(variance_threshold)
-    
-#     # Fit the selector to the data; Keep columns with non-zero variance
-#     selector.fit(df.fillna(0)) # fill missing values with 0 so the methond works
-#     # We won't use these imputed values for modeling
-#     mask = selector.get_support()
-
-#     # Keep columns with non-zero variance
-#     keep_cols = df.columns[mask]
-
-#     return df[keep_cols]
-
 def drop_near_zero_variance(df, freq_threshold=0.95):
     """
     Remove quasi-constant features where the most frequent value 

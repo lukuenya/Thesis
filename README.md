@@ -1,11 +1,12 @@
 # PROJECT OVERVIEW
-This project is for my master thesis in Data Science. The aim is to develop a machine learning model that predicts frailty scores based on both the FRIED protocol and the "Expert's Eye." The focus is on understanding the features driving these scores, comparing the two scoring systems, and identifying their common feature space to improve explainability and clinical utility.
+This project is for my master thesis in Data Science. The aim is to develop a machine learning model that (predicts frailty scores - For Regression) or classifies participants as healthy or frail (For Classification) based on both the "FRIED protocol" and the "Expert's Eye". 
+The focus is on understanding the features driving these scores or classes, comparing the two scoring systems or classification models, and identifying their common feature space to improve explainability and clinical utility.
 For easiness purposes, we will use binary classification problem to predict the FRIED and FRAGIRE18 states of frailty: 0 for healthy and 1 for frail. 
 
 ## Research Objectives
 1. Develop accurate prediction models for both FRIED and FRAGIRE18 frailty score
 2. Compare and contrast these two frailty assessment methods
-3. Identify key features that influence both scoring systems
+3. Identify key features that influence both scoring systems or classification models
 4. Evaluate the clinical applicability and reliability of ML-based frailty assessments
 
 # METHODOLOGY
@@ -39,7 +40,7 @@ For easiness purposes, we will use binary classification problem to predict the 
 
 ### Hyperparameter Optimization
 - Framework: Optuna
-- Optimization metric: AUC
+- Optimization metric: AUC and F1-Score
 - Number of trials: 100
 - Cross-validation: 5-fold
 
@@ -91,10 +92,10 @@ Potential areas for extending the validation framework:
   - Score definitions
 
 - `src/`: Python source code
-  - `optuna_optimization.py`: Model training and optimization
-  - `analyze_optimization.py`: Result analysis and validation
-  - `config.py`: Configuration parameters
-  - `utils.py`: Utility functions
+  - `train_optimize.py`: Model training and optimization
+  - `get_feature_importances.py`: Feature importance analysis
+  - `feature_selection.py`: Feature selection and aggregation
+  - `config.py`: Configuration file
 
 - `models/`: Trained models and optimization studies
   - Saved model states
@@ -122,8 +123,21 @@ Potential areas for extending the validation framework:
 # REPRODUCIBILITY
 All experiments can be reproduced using the provided code:
 1. Configure parameters in `config.py`
-2. Run model optimization: `python src/optuna_optimization.py`
-3. Analyze results: `python src/analyze_optimization.py`
+2. Run :
+      - `python src/get_feature_importances.py --score_type FRIED --model_name lightgbm`
+      - `python src/get_feature_importances.py --score_type FRIED --model_name xgboost`
+      - `python src/get_feature_importances.py --score_type FRIED --model_name catboost`
+      - `python src/get_feature_importances.py --score_type FRAGIRE18 --model_name lightgbm`
+      - `python src/get_feature_importances.py --score_type FRAGIRE18 --model_name xgboost`
+      - `python src/get_feature_importances.py --score_type FRAGIRE18 --model_name catboost`
+   for dimensionality reduction based on each model feature importances.
+3. Run :
+      - `python feature_selection.py --score_type FRIED --threshold_percentile 20`
+      - `python feature_selection.py --score_type FRAGIRE18 --threshold_percentile 20`
+   to aggregate feature importances and select top features for each score type.
+4. Train final models with selected features:
+      - `python train_optimize.py --score_type FRIED --model_name lightgbm --selected_features`
+      - `python train_optimize.py --score_type FRAGIRE18 --model_name lightgbm --selected_features`
 
 # DEPENDENCIES
 Required Python packages are listed in `requirements.txt`

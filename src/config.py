@@ -6,6 +6,8 @@ TRAINING_FILE = "../input/data_global.xlsx"
 
 MODEL_OUTPUT = "../models/classifiers/"
 
+FEATURES_IMPORTANCE_OUTPUT = "../models/feature_importances/"
+
 VISUALIZATION_OUTPUT = "../visualization/"
 
 
