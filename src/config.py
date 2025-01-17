@@ -8,7 +8,7 @@ MODEL_OUTPUT = "../models/classifiers/"
 
 FEATURES_IMPORTANCE_OUTPUT = "../models/feature_importances/"
 
-VISUALIZATION_OUTPUT = "../visualization/"
+VISUALIZATION_OUTPUT = "../visualization/svg/"
 
 
 COLS_TO_DROP_FRAGIRE18_FRIED = [

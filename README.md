@@ -104,12 +104,13 @@ For easiness purposes, we will use binary classification problem to predict the 
 All experiments can be reproduced using the provided code:
 1. Configure parameters in `config.py`
 2. Run :
-      - `python src/get_feature_importances.py --score_type FRIED --model_name lightgbm`
-      - `python src/get_feature_importances.py --score_type FRIED --model_name xgboost`
-      - `python src/get_feature_importances.py --score_type FRIED --model_name catboost`
-      - `python src/get_feature_importances.py --score_type FRAGIRE18 --model_name lightgbm`
-      - `python src/get_feature_importances.py --score_type FRAGIRE18 --model_name xgboost`
-      - `python src/get_feature_importances.py --score_type FRAGIRE18 --model_name catboost`
+      - `cd src`
+      - `python get_feature_importances.py --score_type FRIED --model_name lightgbm`
+      - `python get_feature_importances.py --score_type FRIED --model_name xgboost`
+      - `python get_feature_importances.py --score_type FRIED --model_name catboost`
+      - `python get_feature_importances.py --score_type FRAGIRE18 --model_name lightgbm`
+      - `python get_feature_importances.py --score_type FRAGIRE18 --model_name xgboost`
+      - `python get_feature_importances.py --score_type FRAGIRE18 --model_name catboost`
    for dimensionality reduction based on each model feature importances.
 3. Run :
       - `python feature_selection.py --score_type FRIED --threshold_percentile 20`

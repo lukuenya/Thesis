@@ -42,10 +42,20 @@ def plot_roc_curves(y_true, y_pred_proba, score_type, model_name, selected_featu
     plt.grid(True)
     
     suffix = '_selected' if selected_features else ''
+    base_filename = f'roc_curve_{score_type.lower()}_{model_name}{suffix}'
+    
+    # Save as PNG
     plt.savefig(os.path.join(
         config.VISUALIZATION_OUTPUT,
-        f'roc_curve_{score_type.lower()}_{model_name}{suffix}.png'
-    ))
+        f'{base_filename}.png'
+    ), dpi=300, bbox_inches='tight')
+    
+    # Save as SVG
+    plt.savefig(os.path.join(
+        config.VISUALIZATION_OUTPUT,
+        f'{base_filename}.svg'
+    ), format='svg', bbox_inches='tight')
+    
     plt.close()
 
 def plot_precision_recall_curve(y_true, y_pred_proba, score_type, model_name, selected_features=False):
@@ -62,10 +72,20 @@ def plot_precision_recall_curve(y_true, y_pred_proba, score_type, model_name, se
     plt.grid(True)
     
     suffix = '_selected' if selected_features else ''
+    base_filename = f'pr_curve_{score_type.lower()}_{model_name}{suffix}'
+    
+    # Save as PNG
     plt.savefig(os.path.join(
         config.VISUALIZATION_OUTPUT,
-        f'pr_curve_{score_type.lower()}_{model_name}{suffix}.png'
-    ))
+        f'{base_filename}.png'
+    ), dpi=300, bbox_inches='tight')
+    
+    # Save as SVG
+    plt.savefig(os.path.join(
+        config.VISUALIZATION_OUTPUT,
+        f'{base_filename}.svg'
+    ), format='svg', bbox_inches='tight')
+    
     plt.close()
 
 def plot_confusion_matrix_custom(y_true, y_pred, score_type, model_name, selected_features=False):
@@ -79,10 +99,20 @@ def plot_confusion_matrix_custom(y_true, y_pred, score_type, model_name, selecte
     plt.title(f'Confusion Matrix - {score_type} ({model_name})')
     
     suffix = '_selected' if selected_features else ''
+    base_filename = f'confusion_matrix_{score_type.lower()}_{model_name}{suffix}'
+    
+    # Save as PNG
     plt.savefig(os.path.join(
         config.VISUALIZATION_OUTPUT,
-        f'confusion_matrix_{score_type.lower()}_{model_name}{suffix}.png'
-    ))
+        f'{base_filename}.png'
+    ), dpi=300, bbox_inches='tight')
+    
+    # Save as SVG
+    plt.savefig(os.path.join(
+        config.VISUALIZATION_OUTPUT,
+        f'{base_filename}.svg'
+    ), format='svg', bbox_inches='tight')
+    
     plt.close()
 
 def plot_threshold_impact(y_true, y_pred_proba, score_type, model_name, selected_features=False):
@@ -111,10 +141,20 @@ def plot_threshold_impact(y_true, y_pred_proba, score_type, model_name, selected
     plt.legend()
     
     suffix = '_selected' if selected_features else ''
+    base_filename = f'threshold_impact_{score_type.lower()}_{model_name}{suffix}'
+    
+    # Save as PNG
     plt.savefig(os.path.join(
         config.VISUALIZATION_OUTPUT,
-        f'threshold_impact_{score_type.lower()}_{model_name}{suffix}.png'
-    ))
+        f'{base_filename}.png'
+    ), dpi=300, bbox_inches='tight')
+    
+    # Save as SVG
+    plt.savefig(os.path.join(
+        config.VISUALIZATION_OUTPUT,
+        f'{base_filename}.svg'
+    ), format='svg', bbox_inches='tight')
+    
     plt.close()
     
     return optimal_threshold, optimal_f1
@@ -146,10 +186,20 @@ def plot_feature_importance(feature_importances, feature_names, score_type, mode
     plt.tight_layout()
     
     suffix = '_selected' if selected_features else ''
+    base_filename = f'feature_importance_{score_type.lower()}_{model_name}{suffix}'
+    
+    # Save as PNG
     plt.savefig(os.path.join(
         config.VISUALIZATION_OUTPUT,
-        f'feature_importance_{score_type.lower()}_{model_name}{suffix}.png'
-    ), bbox_inches='tight', dpi=300)
+        f'{base_filename}.png'
+    ), dpi=300, bbox_inches='tight')
+    
+    # Save as SVG
+    plt.savefig(os.path.join(
+        config.VISUALIZATION_OUTPUT,
+        f'{base_filename}.svg'
+    ), format='svg', bbox_inches='tight')
+    
     plt.close()
 
 
@@ -170,8 +220,8 @@ def get_hyperparameter_space(trial, model_name):
 
             'reg_alpha': trial.suggest_float("reg_alpha", 1e-8, 10.0, log=True),
             'reg_lambda': trial.suggest_float("reg_lambda", 1e-8, 10.0, log=True),
-            'n_estimators': trial.suggest_int('n_estimators', 30, 200),
-            'num_leaves': trial.suggest_int('num_leaves', 20, 200),
+            'n_estimators': trial.suggest_int('n_estimators', 30, 300),
+            'num_leaves': trial.suggest_int('num_leaves', 50, 500),
             'max_depth': trial.suggest_int('max_depth', 3, 10),
             'learning_rate': trial.suggest_float('learning_rate', 1e-3, 1e-1, log=True),
             'boosting_type': trial.suggest_categorical('boosting_type', ['dart', 'gbdt'])
@@ -184,6 +234,7 @@ def get_hyperparameter_space(trial, model_name):
             'nthreads': -1,
             'random_state': 42,
             'verbosity': 0,
+            'scale_pos_weight': 4.59375,  # Using Fried ratio as it's more imbalanced
 
             'n_estimators': trial.suggest_int('n_estimators', 50, 300),
             'alpha': trial.suggest_float('alpha', 1e-3, 10.0, log=True),
@@ -297,7 +348,7 @@ def optimize_model(score_type, n_trials, model_name, selected_features=False):
     # 2. Split off a test set (unseen data)
     X_train, X_test, y_train, y_test = train_test_split(
         X_full, y_full, 
-        test_size=0.25,
+        test_size=0.30,
         random_state=42,
         stratify=y_full
     )
@@ -328,7 +379,7 @@ def optimize_model(score_type, n_trials, model_name, selected_features=False):
     test_auc = roc_auc_score(y_test, test_proba)
     print(f"\nHold-out Test AUC: {test_auc:.4f}")
 
-    # (Optionally find threshold based on training data)
+    # find threshold based on training data
     train_proba = final_model.predict_proba(X_train)[:, 1]
     best_thresh, best_f1 = find_optimal_threshold(y_train, train_proba)
     print(f"Optimal threshold on training set = {best_thresh:.2f} (F1={best_f1:.2f})")
