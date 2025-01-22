@@ -16,22 +16,31 @@ parts/
 sdist/
 var/
 wheels/
-catboost_info/
+src/catboost_info/
 *.egg-info/
 .installed.cfg
 *.egg
+code_descriptors_postural_control/
+Writing/
+.gitignore
+*.json
+src/results/
+src/data_proc/
+src/old_scripts/
 
-# Input data files
-input/
-*.csv
-*.xlsx
-*.xls
+# # Input data files
+input/Old data/
+input/data_v2.xlsx
+input/df_merged_v2.xlsx
+# *.csv
+# *.xlsx
+# *.xls
 
-# Model files and outputs
-models/
-*.joblib
-*.pkl
-*.h5
+# # Model files and outputs
+# models/
+# *.joblib
+# *.pkl
+# *.h5
 
 # # Jupyter Notebook
 # .ipynb_checkpoints
