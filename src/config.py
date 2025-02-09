@@ -4,11 +4,14 @@
 
 TRAINING_FILE = "../input/data_global.xlsx"
 
-MODEL_OUTPUT = "../models/classifiers/"
+MODEL_OUTPUT_classification = "../models/classifiers/"
+MODEL_OUTPUT_regression = "../models/regressors/"
 
-FEATURES_IMPORTANCE_OUTPUT = "../models/feature_importances/"
+FEATURES_IMPORTANCE_OUTPUT_classification = "../models/feature_importances/feat_imp_classification/"
+FEATURES_IMPORTANCE_OUTPUT_regression = "../models/feature_importances/feat_imp_regression/"
 
-VISUALIZATION_OUTPUT = "../visualization/svg/"
+VISUALIZATION_OUTPUT_Classification = "../visualization/classification/"
+VISUALIZATION_OUTPUT_Regression = "../visualization/regression/"
 
 
 COLS_TO_DROP_FRAGIRE18_FRIED = [
@@ -28,3 +31,6 @@ COLS_TO_DROP_FRAGIRE18_FRIED = [
     "has_followup_gait", 
     "has_followup_grip",
 ]
+
+# Drop folow-up columns
+COLS_TO_DROP_FOLLOW_UP_PATTERN = "*_follow-up"

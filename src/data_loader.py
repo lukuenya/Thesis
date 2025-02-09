@@ -6,7 +6,7 @@ import config
 import preprocessing
 import os
 
-def load_data(target_score='FRIED'):
+def load_data(target_score='FRIED', task='classification'):
     """
     Load the dataset and prepare X, y for model training
     
@@ -14,25 +14,39 @@ def load_data(target_score='FRIED'):
     -----------
     target_score : str, optional (default='FRIED')
         Which score to predict: 'FRIED' or 'FRAGIRE18'
+    task : str, optional (default='classification')
+        Type of task: 'classification' or 'regression'
     
     Returns:
     --------
     X : pd.DataFrame
         Feature matrix
     y : pd.Series
-        Target variable (FRIED or FRAGIRE18 score)
+        Target variable (FRIED or FRAGIRE18 score/state)
     """
     df = pd.read_excel(config.TRAINING_FILE)
     
     if target_score.upper() == 'FRIED':
         # Drop FRIED-related columns and FRAGIRE18 score
-        X = df.drop(config.COLS_TO_DROP_FRAGIRE18_FRIED + ['Fried_State'], axis=1)
-        y = df.Fried_State
+        if task == 'classification':
+            X = df.drop(config.COLS_TO_DROP_FRAGIRE18_FRIED + ['Fried_State'], axis=1)
+            y = df.Fried_State
+        else:  # regression
+            X = df.drop(config.COLS_TO_DROP_FRAGIRE18_FRIED + ['Fried_Score_FRIED_TOTAL_Version_1'], axis=1)
+            y = df.Fried_Score_FRIED_TOTAL_Version_1
     else:  # FRAGIRE18
         # Drop FRAGIRE18 score and FRIED-related columns
-        X = df.drop(config.COLS_TO_DROP_FRAGIRE18_FRIED + ['Frailty_State_GFST'], axis=1)
-        y = df.Frailty_State_GFST
+        if task == 'classification':
+            X = df.drop(config.COLS_TO_DROP_FRAGIRE18_FRIED + ['Frailty_State_GFST'], axis=1)
+            y = df.Frailty_State_GFST
+        else:  # regression
+            X = df.drop(config.COLS_TO_DROP_FRAGIRE18_FRIED + ['Frailty_Score_FRAGIRE18_SQ001'], axis=1)
+            y = df.Frailty_Score_FRAGIRE18_SQ001
 
+    # Drop folow-up columns
+    follow_up_cols = [col for col in X.columns if col.endswith('follow-up')]
+    X = X.drop(follow_up_cols, axis=1)
+    
     # # Remove any remaining non-numeric columns
     # X = X.select_dtypes(include=[np.number])
 
@@ -58,9 +72,12 @@ def load_data(target_score='FRIED'):
     
     return X, y, feature_names
 
-def load_selected_features(score_type):
+def load_selected_features(score_type, task='classification'):
     """Load the list of selected features from file"""
-    feature_file = os.path.join(config.FEATURES_IMPORTANCE_OUTPUT, f"selected_features_{score_type.lower()}.txt")
+    output_dir = (config.FEATURES_IMPORTANCE_OUTPUT_classification 
+                 if task == 'classification' 
+                 else config.FEATURES_IMPORTANCE_OUTPUT_regression)
+    feature_file = os.path.join(output_dir, f"selected_features_{score_type.lower()}.txt")
     if not os.path.exists(feature_file):
         raise FileNotFoundError(f"Selected features file not found: {feature_file}")
     
@@ -68,7 +85,7 @@ def load_selected_features(score_type):
         selected_features = [line.strip() for line in f.readlines()]
     return selected_features
 
-def load_data_with_selected_features(target_score='FRIED'):
+def load_data_with_selected_features(target_score='FRIED', task='classification'):
     """
     Load the dataset using only selected important features
     
@@ -76,6 +93,8 @@ def load_data_with_selected_features(target_score='FRIED'):
     -----------
     target_score : str, optional (default='FRIED')
         Which score to predict: 'FRIED' or 'FRAGIRE18'
+    task : str, optional (default='classification')
+        Type of task: 'classification' or 'regression'
     
     Returns:
     --------
@@ -87,16 +106,19 @@ def load_data_with_selected_features(target_score='FRIED'):
         Names of selected features
     """
     # Load full dataset
-    X, y, all_features = load_data(target_score)
+    X, y, _ = load_data(target_score, task)
     
     # Load selected features
-    selected_features = load_selected_features(target_score)
+    selected_features = load_selected_features(target_score, task)
     
-    # Convert all_features (Index) to list and get indices of selected features
-    all_features_list = all_features.tolist()
-    selected_indices = [all_features_list.index(feat) for feat in selected_features]
+    # Convert X back to DataFrame with original column names
+    X = pd.DataFrame(X, columns=_)
     
-    # Select only the important features
-    X_selected = X[:, selected_indices]
+    # Select only important features
+    X = X[selected_features]
     
-    return X_selected, y, selected_features
+    # Get feature names and convert to numpy arrays
+    feature_names = X.columns
+    X = X.values
+    
+    return X, y, feature_names

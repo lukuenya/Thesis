@@ -6,13 +6,13 @@ import data_loader
 import config
 from sklearn.preprocessing import StandardScaler
 from sklearn.feature_selection import SelectFromModel
-from lightgbm import LGBMClassifier
-from xgboost import XGBClassifier
-from catboost import CatBoostClassifier
+from lightgbm import LGBMClassifier, LGBMRegressor
+from xgboost import XGBClassifier, XGBRegressor
+from catboost import CatBoostClassifier, CatBoostRegressor
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-def load_feature_importances(score_type):
+def load_feature_importances(score_type, task='classification'):
     """
     Load feature importance files for all models
     """
@@ -20,8 +20,11 @@ def load_feature_importances(score_type):
     models = ['lightgbm', 'xgboost', 'catboost']
     
     for model in models:
-        filepath = os.path.join(config.FEATURES_IMPORTANCE_OUTPUT, 
-                              f"{model}_{score_type.lower()}_feature_importances.xlsx")
+        filepath = os.path.join(
+            config.FEATURES_IMPORTANCE_OUTPUT_classification if task == 'classification' 
+            else config.FEATURES_IMPORTANCE_OUTPUT_regression,
+            f"{model}_{score_type.lower()}_feature_importances.xlsx"
+        )
         if os.path.exists(filepath):
             df = pd.read_excel(filepath)
             importances[model] = df
@@ -80,150 +83,151 @@ def select_top_features(agg_importance, threshold_percentile=20):
     selected_features = agg_importance[agg_importance['Mean_Importance'] >= threshold]['Feature'].tolist()
     return selected_features
 
-def save_selected_features(selected_features, score_type):
+def save_selected_features(selected_features, score_type, task='classification'):
     """Save selected features to a file"""
-    os.makedirs(config.FEATURES_IMPORTANCE_OUTPUT, exist_ok=True)
-    output_file = os.path.join(config.FEATURES_IMPORTANCE_OUTPUT, f"selected_features_{score_type.lower()}.txt")
+    output_dir = (config.FEATURES_IMPORTANCE_OUTPUT_classification 
+                 if task == 'classification' 
+                 else config.FEATURES_IMPORTANCE_OUTPUT_regression)
+    os.makedirs(output_dir, exist_ok=True)
+    output_file = os.path.join(output_dir, f"selected_features_{score_type.lower()}.txt")
     with open(output_file, 'w') as f:
         for feature in selected_features:
             f.write(f"{feature}\n")
     print(f"Selected features saved to: {output_file}")
 
-def plot_feature_importance_comparison(importances, score_type, n_features=10):
+def plot_feature_importance_comparison(importances, score_type, task='classification', n_features=10):
     """
     Plot feature importances comparison across models.
     
     Parameters:
     -----------
     importances : dict
-        Dictionary containing feature importance DataFrames for each model
+        Dictionary containing feature importances from different models
     score_type : str
-        Type of score (FRIED or FRAGIRE18)
-    n_features : int
+        Type of score being predicted (FRIED or FRAGIRE18)
+    task : str
+        Type of task (classification or regression)
+    n_features : int, optional (default=10)
         Number of top features to plot
     """
-    # Get aggregated importances to determine top features
-    agg_df = aggregate_feature_importance(importances)
-    top_features = agg_df['Feature'].head(n_features).tolist()
+    # Get mean importance across models for each feature
+    mean_importance = {}
+    for feature in importances['lightgbm']['Feature'].unique():
+        feature_importances = []
+        for model in importances.keys():
+            importance = importances[model][importances[model]['Feature'] == feature]['Importance'].values[0]
+            feature_importances.append(importance)
+        mean_importance[feature] = np.mean(feature_importances)
+    
+    # Sort features by mean importance
+    sorted_features = sorted(mean_importance.items(), key=lambda x: x[1], reverse=True)
+    top_features = sorted_features[:n_features]
     
     # Prepare data for plotting
-    plot_data = []
-    n_folds = 5  # Number of CV folds
+    features = [x[0] for x in top_features]
+    model_importances = {model: [] for model in importances.keys()}
+    for feature in features:
+        for model in importances.keys():
+            importance = importances[model][importances[model]['Feature'] == feature]['Importance'].values[0]
+            model_importances[model].append(importance)
     
-    for model_name, imp_df in importances.items():
-        # Normalize importances
-        total_importance = imp_df['Importance'].sum()
-        imp_df = imp_df.copy()
-        imp_df['Normalized_Importance'] = imp_df['Importance'] / total_importance
-        # Convert to Standard Error
-        imp_df['Error'] = (imp_df['Importance_STD'] / total_importance) / np.sqrt(n_folds)
-        
-        # Filter for top features and add model name
-        model_data = imp_df[imp_df['Feature'].isin(top_features)].copy()
-        model_data['Model'] = model_name.upper()
-        plot_data.append(model_data)
-    
-    # Combine all data
-    plot_df = pd.concat(plot_data, ignore_index=True)
-    
-    # Create the plot
-    plt.figure(figsize=(12, 6))  # Reduced height
-    
-    # Create grouped bar plot
+    # Create bar plot
+    plt.figure(figsize=(12, 6))
     bar_width = 0.25
-    models = plot_df['Model'].unique()
-    x = np.arange(len(top_features))
+    r1 = np.arange(len(features))
+    r2 = [x + bar_width for x in r1]
+    r3 = [x + bar_width for x in r2]
     
-    colors = ['#2196F3', '#FFA726', '#66BB6A']  # More muted colors
+    plt.bar(r1, model_importances['lightgbm'], width=bar_width, label='LightGBM', color='lightgreen')
+    plt.bar(r2, model_importances['xgboost'], width=bar_width, label='XGBoost', color='blue')
+    plt.bar(r3, model_importances['catboost'], width=bar_width, label='CatBoost', color='red')
     
-    for i, (model, color) in enumerate(zip(models, colors)):
-        model_data = plot_df[plot_df['Model'] == model]
-        # Sort features in same order as top_features
-        model_data = model_data.set_index('Feature').loc[top_features].reset_index()
-        
-        plt.bar(x + i*bar_width, 
-               model_data['Normalized_Importance'],
-               bar_width,
-               label=model,
-               color=color,
-               alpha=0.8)  
-        
-        # Add error bars with smaller caps
-        plt.errorbar(x + i*bar_width, 
-                    model_data['Normalized_Importance'],
-                    yerr=model_data['Error'],
-                    fmt='none',
-                    color='black',
-                    capsize=3,
-                    capthick=1,
-                    linewidth=1,
-                    alpha=0.5)  
-    
-    plt.xlabel('Features', fontsize=10)
-    plt.ylabel('Normalized Importance', fontsize=10)
-    plt.title(f'Feature Importance - {score_type}', fontsize=12, pad=20)
-    
-    # Adjust x-axis labels
-    plt.xticks(x + bar_width, top_features, rotation=45, ha='right', fontsize=9)
-    plt.yticks(fontsize=9)
-    
-    # Add legend with smaller font
-    plt.legend(fontsize=9, loc='upper right')
-    
-    # Adjust grid
-    plt.grid(True, axis='y', linestyle='--', alpha=0.3)
-    
-    # Tight layout with more space for feature names
+    plt.xlabel('Features')
+    plt.ylabel('Importance')
+    plt.title(f'Top {n_features} Feature Importances Comparison - {score_type}')
+    plt.xticks([r + bar_width for r in range(len(features))], features, rotation=45, ha='right')
+    plt.legend()
     plt.tight_layout()
     
+    # Create output directory if it doesn't exist
+    output_dir = (config.VISUALIZATION_OUTPUT_Classification 
+                 if task == 'classification' 
+                 else config.VISUALIZATION_OUTPUT_Regression)
+    os.makedirs(output_dir, exist_ok=True)
+    
     # Save plot
-    os.makedirs(config.VISUALIZATION_OUTPUT, exist_ok=True)
     plt.savefig(
-        os.path.join(config.VISUALIZATION_OUTPUT, f'feature_importance_comparison_{score_type.lower()}.svg'),
-        format='svg',
-        bbox_inches='tight',
-        dpi=300
+        os.path.join(output_dir, f'feature_importance_comparison_{score_type.lower()}.png'),
+        dpi=300,
+        bbox_inches='tight'
     )
     plt.close()
 
-def main(score_type, threshold_percentile=20):
+def main(score_type, task='classification', threshold_percentile=20):
     """
     Main function to perform feature selection
     """
-    print(f"Loading feature importances for {score_type}...")
-    importances = load_feature_importances(score_type)
+    # Load data
+    X, y, feature_names = data_loader.load_data(score_type, task)
     
-    if not importances:
-        print("No feature importance files found. Please run 'get_feature_importances' first.")
-        return
+    # Initialize models based on task
+    if task == 'classification':
+        models = {
+            'lightgbm': LGBMClassifier(random_state=42),
+            'xgboost': XGBClassifier(random_state=42),
+            'catboost': CatBoostClassifier(random_state=42)
+        }
+    else:  # regression
+        models = {
+            'lightgbm': LGBMRegressor(random_state=42),
+            'xgboost': XGBRegressor(random_state=42),
+            'catboost': CatBoostRegressor(random_state=42)
+        }
     
-    print("Aggregating feature importances across models...")
+    # Calculate and save feature importances for each model
+    for name, model in models.items():
+        model.fit(X, y)
+        importance = model.feature_importances_
+        importance_std = np.zeros_like(importance)  # No std for single run
+        
+        # Save feature importances
+        importance_df = pd.DataFrame({
+            'Feature': feature_names,
+            'Importance': importance,
+            'Importance_STD': importance_std
+        }).sort_values('Importance', ascending=False)
+        
+        output_dir = (config.FEATURES_IMPORTANCE_OUTPUT_classification 
+                     if task == 'classification' 
+                     else config.FEATURES_IMPORTANCE_OUTPUT_regression)
+        os.makedirs(output_dir, exist_ok=True)
+        importance_df.to_excel(
+            os.path.join(output_dir, f"{name}_{score_type.lower()}_feature_importances.xlsx"),
+            index=False
+        )
+    
+    # Load feature importances
+    importances = load_feature_importances(score_type, task)
+    
+    # Aggregate importances and select top features
     agg_importance = aggregate_feature_importance(importances)
-    
-    print(f"\nTop 10 most important features:")
-    print(agg_importance.head(10))
-    
-    print(f"\nCreating feature importance comparison plot...")
-    plot_feature_importance_comparison(importances, score_type)
-    
-    print(f"\nSelecting top {threshold_percentile}% features...")
     selected_features = select_top_features(agg_importance, threshold_percentile)
     
-    print(f"Selected {len(selected_features)} features out of {len(agg_importance)}")
-    
     # Save selected features
-    save_selected_features(selected_features, score_type)
+    save_selected_features(selected_features, score_type, task)
     
-    return selected_features
+    # Plot feature importance comparison
+    plot_feature_importance_comparison(importances, score_type, task)
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='Feature selection based on model importances')
     parser.add_argument('--score_type', type=str, default='FRIED',
-                      choices=['FRIED', 'FRAGIRE18'],
-                      help='Which score to use for feature selection')
-    parser.add_argument('--threshold_percentile', type=int, default=20,
-                      help='Keep features with importance in top X percentile')
-    
+                      help='Type of score to predict (FRIED or FRAGIRE18)')
+    parser.add_argument('--task', type=str, default='classification',
+                      help='Type of task (classification or regression)')
+    parser.add_argument('--threshold_percentile', type=float, default=20,
+                      help='Percentile threshold for feature selection')
     args = parser.parse_args()
-    selected_features = main(args.score_type, args.threshold_percentile)
+    
+    main(args.score_type, args.task, args.threshold_percentile)

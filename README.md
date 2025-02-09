@@ -11,6 +11,14 @@ For easiness purposes, we will use binary classification problem to predict the 
 
 # METHODOLOGY
 
+## Target Variables
+- Classification (binary: 0 for healthy and 1 for frail)
+   - Score type: FRIED -> 'Fried_State'
+   - Score type: FRAGIRE18 -> 'Frailty_State_GFST'
+- Regression (continuous: score value)
+   - Score type: FRIED -> 'Fried_Score_FRIED_TOTAL_Version_1'
+   - Score type: FRAGIRE18 -> 'Frailty_Score_FRAGIRE18_SQ001'
+
 ## Data Preprocessing
 1. Feature Selection and Engineering
    - Removal of highly correlated features (list in config.py)
@@ -44,7 +52,9 @@ For easiness purposes, we will use binary classification problem to predict the 
 
 ### Hyperparameter Optimization
 - Framework: Optuna
-- Optimization metric: AUC and F1-Score
+- Optimization metric: 
+   - Classification: ROC AUC and F1-Score
+   - Regression: RMSE
 - Number of trials: 50
 - Cross-validation: 5-fold
 
@@ -53,13 +63,17 @@ For easiness purposes, we will use binary classification problem to predict the 
 ### Statistical Validation
 
 1. **Model Performance Metrics**
-   - ROC AUC
-   - ROC curve
-   - Precision-Recall curve
+   - Classification:
+     - ROC AUC
+     - ROC curve
+     - Precision-Recall curve
+   - Regression:
+     - RMSE
 
 2. **Cross-Validation Strategy**
    - 5-fold Cross-validation
-     * Stratified by class distribution
+      - Classification: Stratified by class distribution
+      - Regression: K-fold cross-validation
 
 ### Clinical Validation
  - Feature Importance
@@ -89,9 +103,6 @@ For easiness purposes, we will use binary classification problem to predict the 
 
 # RESULTS INTERPRETATION
 
-## Model Performance Metrics
-- ROC AUC with 95% confidence intervals
-
 ## Clinical Impact Assessment
 - Feature importance for clinical interpretation
 
@@ -113,8 +124,10 @@ All experiments can be reproduced using the provided code:
       - `python get_feature_importances.py --score_type FRAGIRE18 --model_name catboost`
    for dimensionality reduction based on each model feature importances.
 3. Run :
-      - `python feature_selection.py --score_type FRIED --threshold_percentile 20`
-      - `python feature_selection.py --score_type FRAGIRE18 --threshold_percentile 20`
+      - `python feature_selection.py --score_type FRIED --task classification --threshold_percentile 20`
+      - `python feature_selection.py --score_type FRAGIRE18 --task classification --threshold_percentile 20`
+      - `python feature_selection.py --score_type FRIED --task regression --threshold_percentile 20`
+      - `python feature_selection.py --score_type FRAGIRE18 --task regression --threshold_percentile 20`
    to aggregate feature importances and select top features for each score type.
 4. Train final models with selected features:
       - `python train_optimize.py --score_type FRIED --model_name lightgbm --selected_features`

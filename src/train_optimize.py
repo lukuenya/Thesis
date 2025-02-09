@@ -7,15 +7,16 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 from functools import partial
-from sklearn.model_selection import train_test_split, StratifiedKFold
+from sklearn.model_selection import train_test_split, StratifiedKFold, KFold
 from sklearn.metrics import (
     roc_auc_score, precision_recall_curve, average_precision_score,
-    confusion_matrix, classification_report, roc_curve, f1_score
+    confusion_matrix, classification_report, roc_curve, f1_score,
+    mean_squared_error, r2_score, mean_absolute_error
 )
 
-from xgboost import XGBClassifier
-from lightgbm import LGBMClassifier
-from catboost import CatBoostClassifier
+from xgboost import XGBClassifier, XGBRegressor
+from lightgbm import LGBMClassifier, LGBMRegressor
+from catboost import CatBoostClassifier, CatBoostRegressor
 
 import config
 import data_loader
@@ -46,13 +47,13 @@ def plot_roc_curves(y_true, y_pred_proba, score_type, model_name, selected_featu
     
     # Save as PNG
     plt.savefig(os.path.join(
-        config.VISUALIZATION_OUTPUT,
+        config.VISUALIZATION_OUTPUT_Classification,
         f'{base_filename}.png'
     ), dpi=300, bbox_inches='tight')
     
     # Save as SVG
     plt.savefig(os.path.join(
-        config.VISUALIZATION_OUTPUT,
+        config.VISUALIZATION_OUTPUT_Classification,
         f'{base_filename}.svg'
     ), format='svg', bbox_inches='tight')
     
@@ -76,13 +77,13 @@ def plot_precision_recall_curve(y_true, y_pred_proba, score_type, model_name, se
     
     # Save as PNG
     plt.savefig(os.path.join(
-        config.VISUALIZATION_OUTPUT,
+        config.VISUALIZATION_OUTPUT_Classification,
         f'{base_filename}.png'
     ), dpi=300, bbox_inches='tight')
     
     # Save as SVG
     plt.savefig(os.path.join(
-        config.VISUALIZATION_OUTPUT,
+        config.VISUALIZATION_OUTPUT_Classification,
         f'{base_filename}.svg'
     ), format='svg', bbox_inches='tight')
     
@@ -103,13 +104,13 @@ def plot_confusion_matrix_custom(y_true, y_pred, score_type, model_name, selecte
     
     # Save as PNG
     plt.savefig(os.path.join(
-        config.VISUALIZATION_OUTPUT,
+        config.VISUALIZATION_OUTPUT_Classification,
         f'{base_filename}.png'
     ), dpi=300, bbox_inches='tight')
     
     # Save as SVG
     plt.savefig(os.path.join(
-        config.VISUALIZATION_OUTPUT,
+        config.VISUALIZATION_OUTPUT_Classification,
         f'{base_filename}.svg'
     ), format='svg', bbox_inches='tight')
     
@@ -145,13 +146,13 @@ def plot_threshold_impact(y_true, y_pred_proba, score_type, model_name, selected
     
     # Save as PNG
     plt.savefig(os.path.join(
-        config.VISUALIZATION_OUTPUT,
+        config.VISUALIZATION_OUTPUT_Classification,
         f'{base_filename}.png'
     ), dpi=300, bbox_inches='tight')
     
     # Save as SVG
     plt.savefig(os.path.join(
-        config.VISUALIZATION_OUTPUT,
+        config.VISUALIZATION_OUTPUT_Classification,
         f'{base_filename}.svg'
     ), format='svg', bbox_inches='tight')
     
@@ -159,7 +160,33 @@ def plot_threshold_impact(y_true, y_pred_proba, score_type, model_name, selected
     
     return optimal_threshold, optimal_f1
 
-
+def plot_regression_metrics(y_true, y_pred, score_type, model_name, selected_features=False):
+    """Plot regression metrics and save to file."""
+    mse = mean_squared_error(y_true, y_pred)
+    rmse = np.sqrt(mse)
+    mae = mean_absolute_error(y_true, y_pred)
+    r2 = r2_score(y_true, y_pred)
+    
+    # Create scatter plot of predicted vs actual values
+    plt.figure(figsize=(10, 6))
+    plt.scatter(y_true, y_pred, alpha=0.5)
+    plt.plot([y_true.min(), y_true.max()], [y_true.min(), y_true.max()], 'r--', lw=2)
+    plt.xlabel('Actual Values')
+    plt.ylabel('Predicted Values')
+    plt.title(f'Actual vs Predicted Values - {score_type} ({model_name})\nRMSE: {rmse:.3f}, MAE: {mae:.3f}, R²: {r2:.3f}')
+    plt.grid(True)
+    
+    suffix = '_selected' if selected_features else ''
+    base_filename = f'regression_metrics_{score_type.lower()}_{model_name}{suffix}'
+    
+    # Save as PNG
+    plt.savefig(os.path.join(
+        config.VISUALIZATION_OUTPUT_Regression,
+        f'{base_filename}.png'
+    ), dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    return {'rmse': rmse, 'mae': mae, 'r2': r2}
 
 def plot_feature_importance(feature_importances, feature_names, score_type, model_name, selected_features=False):
     """Plot feature importance and save to file."""
@@ -190,13 +217,13 @@ def plot_feature_importance(feature_importances, feature_names, score_type, mode
     
     # Save as PNG
     plt.savefig(os.path.join(
-        config.VISUALIZATION_OUTPUT,
+        config.VISUALIZATION_OUTPUT_Classification,
         f'{base_filename}.png'
     ), dpi=300, bbox_inches='tight')
     
     # Save as SVG
     plt.savefig(os.path.join(
-        config.VISUALIZATION_OUTPUT,
+        config.VISUALIZATION_OUTPUT_Classification,
         f'{base_filename}.svg'
     ), format='svg', bbox_inches='tight')
     
@@ -207,61 +234,113 @@ def plot_feature_importance(feature_importances, feature_names, score_type, mode
 # UTILITY FUNCTIONS FOR OPTIMIZATION
 # -----------------------------------------------------------------------------
 
-def get_hyperparameter_space(trial, model_name):
+def get_hyperparameter_space(trial, model_name, task):
     """Define hyperparameter search space for each model."""
-    if model_name == "lightgbm":
-        return {
-            'objective': 'binary',
-            'is_unbalance': True,
-            'metric': 'auc',
-            'n_jobs': -1,
-            'random_state': 42,
-            'verbosity': -1,
+    if task == 'classification':
+        if model_name == "lightgbm":
+            return {
+                'objective': 'binary',
+                'is_unbalance': True,
+                'metric': 'auc',
+                'n_jobs': -1,
+                'random_state': 42,
+                'verbosity': -1,
 
-            'reg_alpha': trial.suggest_float("reg_alpha", 1e-8, 10.0, log=True),
-            'reg_lambda': trial.suggest_float("reg_lambda", 1e-8, 10.0, log=True),
-            'n_estimators': trial.suggest_int('n_estimators', 30, 300),
-            'num_leaves': trial.suggest_int('num_leaves', 50, 500),
-            'max_depth': trial.suggest_int('max_depth', 3, 10),
-            'learning_rate': trial.suggest_float('learning_rate', 1e-3, 1e-1, log=True),
-            'boosting_type': trial.suggest_categorical('boosting_type', ['dart', 'gbdt'])
-        }
-    elif model_name == "xgboost":
-        return {
-            'booster': 'dart',
-            'objective': 'binary:logistic',
-            'eval_metric': 'auc',
-            'nthreads': -1,
-            'random_state': 42,
-            'verbosity': 0,
-            'scale_pos_weight': 4.59375,  # Using Fried ratio as it's more imbalanced
+                'reg_alpha': trial.suggest_float("reg_alpha", 1e-8, 10.0, log=True),
+                'reg_lambda': trial.suggest_float("reg_lambda", 1e-8, 10.0, log=True),
+                'n_estimators': trial.suggest_int('n_estimators', 30, 300),
+                'num_leaves': trial.suggest_int('num_leaves', 50, 500),
+                'max_depth': trial.suggest_int('max_depth', 3, 10),
+                'learning_rate': trial.suggest_float('learning_rate', 1e-3, 1e-1, log=True),
+                'boosting_type': trial.suggest_categorical('boosting_type', ['dart', 'gbdt'])
+            }
+        elif model_name == "xgboost":
+            return {
+                'booster': 'dart',
+                'objective': 'binary:logistic',
+                'eval_metric': 'auc',
+                'nthreads': -1,
+                'random_state': 42,
+                'verbosity': 0,
+                'scale_pos_weight': 4.59375,  # Using Fried ratio as it's more imbalanced
 
-            'n_estimators': trial.suggest_int('n_estimators', 50, 300),
-            'alpha': trial.suggest_float('alpha', 1e-3, 10.0, log=True),
-            'max_depth': trial.suggest_int('max_depth', 3, 10),
-            'eta': trial.suggest_float('eta', 0.01, 0.3, log=True),
-            'min_child_weight': trial.suggest_int('min_child_weight', 0, 80),
-            'subsample': trial.suggest_float('subsample', 0.6, 1.0),
-            'colsample_bytree': trial.suggest_float('colsample_bytree', 0.6, 1.0)
-        }
-    elif model_name == "catboost":
-        return {
-            'eval_metric': 'AUC',
-            'random_seed': 42,
-            'thread_count': -1,
-            'verbose': False,
-            'auto_class_weights': 'Balanced',
-            'loss_function': 'Logloss',
+                'n_estimators': trial.suggest_int('n_estimators', 50, 300),
+                'alpha': trial.suggest_float('alpha', 1e-3, 10.0, log=True),
+                'max_depth': trial.suggest_int('max_depth', 3, 10),
+                'eta': trial.suggest_float('eta', 0.01, 0.3, log=True),
+                'min_child_weight': trial.suggest_int('min_child_weight', 0, 80),
+                'subsample': trial.suggest_float('subsample', 0.6, 1.0),
+                'colsample_bytree': trial.suggest_float('colsample_bytree', 0.6, 1.0)
+            }
+        elif model_name == "catboost":
+            return {
+                'eval_metric': 'AUC',
+                'random_seed': 42,
+                'thread_count': -1,
+                'verbose': False,
+                'auto_class_weights': 'Balanced',
+                'loss_function': 'Logloss',
 
-            'iterations': trial.suggest_int('iterations', 30, 300),
-            'depth': trial.suggest_int('depth', 3, 8),
-            'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3),
-            'l2_leaf_reg': trial.suggest_float('l2_leaf_reg', 1e-8, 10.0, log=True),
-            'bagging_temperature': trial.suggest_float('bagging_temperature', 0.0, 1.0),
-            'random_strength': trial.suggest_float('random_strength', 1e-8, 10.0, log=True)
-        }
+                'iterations': trial.suggest_int('iterations', 30, 300),
+                'depth': trial.suggest_int('depth', 3, 8),
+                'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3),
+                'l2_leaf_reg': trial.suggest_float('l2_leaf_reg', 1e-8, 10.0, log=True),
+                'bagging_temperature': trial.suggest_float('bagging_temperature', 0.0, 1.0),
+                'random_strength': trial.suggest_float('random_strength', 1e-8, 10.0, log=True)
+            }
+        else:
+            raise ValueError(f"Unknown model: {model_name}")
     else:
-        raise ValueError(f"Unknown model: {model_name}")
+        if model_name == "lightgbm":
+            return {
+                'objective': 'regression',
+                'metric': 'l2',
+                'n_jobs': -1,
+                'random_state': 42,
+                'verbosity': -1,
+
+                'reg_alpha': trial.suggest_float("reg_alpha", 1e-8, 10.0, log=True),
+                'reg_lambda': trial.suggest_float("reg_lambda", 1e-8, 10.0, log=True),
+                'n_estimators': trial.suggest_int('n_estimators', 30, 300),
+                'num_leaves': trial.suggest_int('num_leaves', 50, 500),
+                'max_depth': trial.suggest_int('max_depth', 3, 10),
+                'learning_rate': trial.suggest_float('learning_rate', 1e-3, 1e-1, log=True),
+                'boosting_type': trial.suggest_categorical('boosting_type', ['dart', 'gbdt'])
+            }
+        elif model_name == "xgboost":
+            return {
+                'booster': 'dart',
+                'objective': 'reg:squarederror',
+                'eval_metric': 'rmse',
+                'nthreads': -1,
+                'random_state': 42,
+                'verbosity': 0,
+
+                'n_estimators': trial.suggest_int('n_estimators', 50, 300),
+                'alpha': trial.suggest_float('alpha', 1e-3, 10.0, log=True),
+                'max_depth': trial.suggest_int('max_depth', 3, 10),
+                'eta': trial.suggest_float('eta', 0.01, 0.3, log=True),
+                'min_child_weight': trial.suggest_int('min_child_weight', 0, 80),
+                'subsample': trial.suggest_float('subsample', 0.6, 1.0),
+                'colsample_bytree': trial.suggest_float('colsample_bytree', 0.6, 1.0)
+            }
+        elif model_name == "catboost":
+            return {
+                'eval_metric': 'RMSE',
+                'random_seed': 42,
+                'thread_count': -1,
+                'verbose': False,
+                'loss_function': 'RMSE',
+
+                'iterations': trial.suggest_int('iterations', 30, 300),
+                'depth': trial.suggest_int('depth', 3, 8),
+                'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3),
+                'l2_leaf_reg': trial.suggest_float('l2_leaf_reg', 1e-8, 10.0, log=True),
+                'bagging_temperature': trial.suggest_float('bagging_temperature', 0.0, 1.0),
+                'random_strength': trial.suggest_float('random_strength', 1e-8, 10.0, log=True)
+            }
+        else:
+            raise ValueError(f"Unknown model: {model_name}")
 
 
 def find_optimal_threshold(y_true, y_pred_proba):
@@ -282,23 +361,36 @@ def find_optimal_threshold(y_true, y_pred_proba):
     return thresholds[best_idx], f1_scores[best_idx]
 
 
-def objective(trial, X, y, model_name):
+def objective(trial, X, y, model_name, task):
     """Optuna objective function for hyperparameter optimization via CV."""
-    params = get_hyperparameter_space(trial, model_name)
+    params = get_hyperparameter_space(trial, model_name, task)
     
     # Create model
-    if model_name == "lightgbm":
-        model = LGBMClassifier(**params)
-    elif model_name == "xgboost":
-        model = XGBClassifier(**params)
-    elif model_name == "catboost":
-        model = CatBoostClassifier(**params)
+    if task == 'classification':
+        if model_name == "lightgbm":
+            model = LGBMClassifier(**params)
+        elif model_name == "xgboost":
+            model = XGBClassifier(**params)
+        elif model_name == "catboost":
+            model = CatBoostClassifier(**params)
+        else:
+            raise ValueError(f"Unknown model: {model_name}")
     else:
-        raise ValueError(f"Unknown model: {model_name}")
+        if model_name == "lightgbm":
+            model = LGBMRegressor(**params)
+        elif model_name == "xgboost":
+            model = XGBRegressor(**params)
+        elif model_name == "catboost":
+            model = CatBoostRegressor(**params)
+        else:
+            raise ValueError(f"Unknown model: {model_name}")
 
-    # Initialize StratifiedKFold
+    # Initialize cross-validation
     n_splits = 5
-    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
+    if task == 'classification':
+        skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
+    else:
+        skf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
     
     # Perform cross-validation
     cv_scores = []
@@ -306,139 +398,135 @@ def objective(trial, X, y, model_name):
         X_train_fold, X_val_fold = X[train_idx], X[val_idx]
         y_train_fold, y_val_fold = y[train_idx], y[val_idx]
         
-        # Train model
-        model.fit(X_train_fold, y_train_fold)
+        model.fit(X_train_fold, y_train_fold, eval_set=[(X_val_fold, y_val_fold)])
         
-        # Get probabilities and find optimal threshold
-        y_val_proba = model.predict_proba(X_val_fold)[:, 1]
+        if task == 'classification':
+            # For classification, maximize AUC
+            y_val_proba = model.predict_proba(X_val_fold)[:, 1]
+            fold_score = roc_auc_score(y_val_fold, y_val_proba)
+        else:
+            # For regression, minimize RMSE
+            y_val_pred = model.predict(X_val_fold)
+            fold_score = -np.sqrt(mean_squared_error(y_val_fold, y_val_pred))  # Negative because Optuna minimizes
         
-        # Calculate AUC for this fold
-        fold_auc = roc_auc_score(y_val_fold, y_val_proba)
-        cv_scores.append(fold_auc)
+        cv_scores.append(fold_score)
     
-    # Return mean AUC across folds
-    mean_auc = np.mean(cv_scores)
-    return mean_auc
+    # Return mean score across folds
+    return np.mean(cv_scores)
 
 
 # -----------------------------------------------------------------------------
 # MAIN TRAINING + OPTIMIZATION + PLOTTING
 # -----------------------------------------------------------------------------
 
-def optimize_model(score_type, n_trials, model_name, selected_features=False):
+def optimize_model(score_type, n_trials, model_name, task='classification', selected_features=False):
     """
-    1) Loads data (with or without selected features).
-    2) Splits into train/test.
-    3) Runs Optuna CV on train only.
-    4) Retrains on entire train set with best params.
-    5) Evaluates on hold-out test set.
-    6) Saves & plots everything (ROC, PR, confusion matrix, etc.).
-    7) Saves final model + feature importances.
+    1) Loads data (with or without selected features)
+    2) Splits into train/test
+    3) Runs Optuna CV on train only
+    4) Retrains on entire train set with best params
+    5) Evaluates on hold-out test set
+    6) Saves & plots everything
+    7) Saves final model + feature importances
     """
+    print(f"\nOptimizing {model_name} for {score_type} ({task})...")
     
-    # 1. Load the dataset
+    # Load data
     if selected_features:
-        X_full, y_full, feature_names = data_loader.load_data_with_selected_features(score_type)
+        X, y, feature_names = data_loader.load_data_with_selected_features(score_type, task)
     else:
-        X_full, y_full, feature_names = data_loader.load_data(score_type)
+        X, y, feature_names = data_loader.load_data(score_type, task)
     
-    print(f"Loaded dataset with shape: {X_full.shape}")
-    print(f"Number of features: {len(feature_names)}")
-
-    # 2. Split off a test set (unseen data)
-    X_train, X_test, y_train, y_test = train_test_split(
-        X_full, y_full, 
-        test_size=0.30,
-        random_state=42,
-        stratify=y_full
-    )
-    print(f"Train shape: {X_train.shape}, Test shape: {X_test.shape}")
-
-    # 3. Hyperparameter optimization with Optuna
-    optimization_fn = partial(objective, X=X_train, y=y_train, model_name=model_name)
-    study = optuna.create_study(direction='maximize')
-    study.optimize(optimization_fn, n_trials=n_trials)
-
+    # Train/test split
+    if task == 'classification':
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.25, random_state=42, stratify=y
+        )
+    else:
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.25, random_state=42
+        )
+    
+    # Create output directories if they don't exist
+    if task == 'classification':
+        os.makedirs(config.MODEL_OUTPUT_classification, exist_ok=True)
+        os.makedirs(config.VISUALIZATION_OUTPUT_Classification, exist_ok=True)
+    else:
+        os.makedirs(config.MODEL_OUTPUT_regression, exist_ok=True)
+        os.makedirs(config.VISUALIZATION_OUTPUT_Regression, exist_ok=True)
+    
+    # Run hyperparameter optimization
+    study = optuna.create_study(direction='maximize' if task == 'classification' else 'minimize')
+    objective_func = partial(objective, X=X_train, y=y_train, model_name=model_name, task=task)
+    study.optimize(objective_func, n_trials=n_trials)
+    
+    # Get best parameters
     best_params = study.best_params
-    best_cv_auc = study.best_value
-    print(f"\n[Optuna] Best CV AUC: {best_cv_auc:.4f}")
-    print(f"[Optuna] Best params: {best_params}")
-
-    # 4. Retrain final model on all training data
-    if model_name == "lightgbm":
-        final_model = LGBMClassifier(**best_params)
-    elif model_name == "xgboost":
-        final_model = XGBClassifier(**best_params)
-    elif model_name == "catboost":
-        final_model = CatBoostClassifier(**best_params)
-
+    print(f"\nBest parameters: {best_params}")
+    
+    # Train final model with best parameters
+    if task == 'classification':
+        if model_name == 'lightgbm':
+            final_model = LGBMClassifier(**best_params)
+        elif model_name == 'xgboost':
+            final_model = XGBClassifier(**best_params)
+        else:  # catboost
+            final_model = CatBoostClassifier(**best_params)
+    else:
+        if model_name == 'lightgbm':
+            final_model = LGBMRegressor(**best_params)
+        elif model_name == 'xgboost':
+            final_model = XGBRegressor(**best_params)
+        else:  # catboost
+            final_model = CatBoostRegressor(**best_params)
+    
+    # Fit final model
     final_model.fit(X_train, y_train)
-
-    # 5. Evaluate on test set
-    test_proba = final_model.predict_proba(X_test)[:, 1]
-    test_auc = roc_auc_score(y_test, test_proba)
-    print(f"\nHold-out Test AUC: {test_auc:.4f}")
-
-    # find threshold based on training data
-    train_proba = final_model.predict_proba(X_train)[:, 1]
-    best_thresh, best_f1 = find_optimal_threshold(y_train, train_proba)
-    print(f"Optimal threshold on training set = {best_thresh:.2f} (F1={best_f1:.2f})")
-
-    # Predictions on test set with that threshold
-    y_test_pred = (test_proba > best_thresh).astype(int)
-    print("\nClassification Report (Test Set):")
-    print(classification_report(y_test, y_test_pred))
-
-    # 6. Create directory for plots if not exists
-    os.makedirs(config.VISUALIZATION_OUTPUT, exist_ok=True)
-
-    # Plot on test set
-    plot_roc_curves(y_test, test_proba, score_type, model_name, selected_features)
-    plot_precision_recall_curve(y_test, test_proba, score_type, model_name, selected_features)
-    plot_confusion_matrix_custom(y_test, y_test_pred, score_type, model_name, selected_features)
-    plot_threshold_impact(y_test, test_proba, score_type, model_name, selected_features)
-
-    # 7. Save final model + metrics
-    # Also get feature importances if supported by the model
-    model_filename = (
-        f"{model_name}_{score_type.lower()}"
-        + ("_selected_features" if selected_features else "_final")
-        + ".joblib"
+    
+    # Save model
+    model_output = (config.MODEL_OUTPUT_classification if task == 'classification' 
+                   else config.MODEL_OUTPUT_regression)
+    suffix = '_selected' if selected_features else ''
+    model_path = os.path.join(
+        model_output,
+        f"{model_name}_{score_type.lower()}{suffix}.joblib"
     )
-
-    save_dict = {
-        'model': final_model,
-        'optimal_threshold': best_thresh,
-        'feature_names': feature_names,
-        'best_params': best_params,
-        'cv_best_auc': best_cv_auc,
-        'holdout_test_auc': test_auc
-    }
-    joblib.dump(save_dict, os.path.join(config.MODEL_OUTPUT, model_filename))
-    print(f"\nModel saved to {model_filename}")
-
-    # 8. Save feature importances (if the model provides them)
-    if hasattr(final_model, 'feature_importances_'):
-        feature_importances = final_model.feature_importances_
-        feature_importances_df = pd.DataFrame({
-            'Feature': feature_names,
-            'Importance': feature_importances
-        }).sort_values('Importance', ascending=False)
-
-        # Save .xlsx
-        importance_filename = (
-            f"{model_name}_{score_type.lower()}"
-            + ("_selected_features_importance.xlsx" if selected_features else "_final_importance.xlsx")
-        )
-        feature_importances_df.to_excel(
-            os.path.join(config.MODEL_OUTPUT, importance_filename),
-            index=False
-        )
-        print(f"Feature importances saved to {importance_filename}")
-
-        # Also plot feature importances
-        plot_feature_importance(feature_importances, feature_names, score_type, model_name, selected_features)
-
+    joblib.dump(final_model, model_path)
+    print(f"Model saved to {model_path}")
+    
+    # Make predictions
+    if task == 'classification':
+        y_pred_proba = final_model.predict_proba(X_test)[:, 1]
+        optimal_threshold, _ = find_optimal_threshold(y_test, y_pred_proba)
+        y_pred = (y_pred_proba >= optimal_threshold).astype(int)
+        
+        # Generate and save plots
+        plot_roc_curves(y_test, y_pred_proba, score_type, model_name, selected_features)
+        # plot_precision_recall_curve(y_test, y_pred_proba, score_type, model_name, selected_features)
+        # plot_confusion_matrix_custom(y_test, y_pred, score_type, model_name, selected_features)
+        # plot_threshold_impact(y_test, y_pred_proba, score_type, model_name, selected_features)
+        
+        # Print classification metrics
+        print("\nClassification Report:")
+        print(classification_report(y_test, y_pred))
+    else:
+        y_pred = final_model.predict(X_test)
+        metrics = plot_regression_metrics(y_test, y_pred, score_type, model_name, selected_features)
+        print("\nRegression Metrics:")
+        print(f"RMSE: {metrics['rmse']:.3f}")
+        print(f"MAE: {metrics['mae']:.3f}")
+        print(f"R²: {metrics['r2']:.3f}")
+    
+    # Plot and save feature importance
+    plot_feature_importance(
+        final_model.feature_importances_,
+        feature_names,
+        score_type,
+        model_name,
+        selected_features
+    )
+    
+    return final_model
 
 # -----------------------------------------------------------------------------
 # CLI ENTRY
@@ -446,22 +534,25 @@ def optimize_model(score_type, n_trials, model_name, selected_features=False):
 
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(description='Train, Optimize, and Plot Model Performance')
+    parser = argparse.ArgumentParser(description='Train and optimize models')
     parser.add_argument('--score_type', type=str, default='FRIED',
-                        choices=['FRIED', 'FRAGIRE18'],
-                        help='Which label or score to optimize for.')
-    parser.add_argument('--n_trials', type=int, default=50,
-                        help='Number of Optuna trials.')
+                      help='Type of score to predict (FRIED or FRAGIRE18)')
     parser.add_argument('--model_name', type=str, default='lightgbm',
-                        choices=['lightgbm', 'xgboost', 'catboost'],
-                        help='Which model to optimize.')
+                      choices=['lightgbm', 'xgboost', 'catboost'],
+                      help='Model to use')
+    parser.add_argument('--task', type=str, default='classification',
+                      choices=['classification', 'regression'],
+                      help='Type of task (classification or regression)')
+    parser.add_argument('--n_trials', type=int, default=25,
+                      help='Number of trials for hyperparameter optimization')
     parser.add_argument('--selected_features', action='store_true',
-                        help='Whether to use only selected features from data_loader.')
-
+                      help='Use only selected important features')
     args = parser.parse_args()
+    
     optimize_model(
-        score_type=args.score_type,
-        n_trials=args.n_trials,
-        model_name=args.model_name,
-        selected_features=args.selected_features
+        args.score_type,
+        args.n_trials,
+        args.model_name,
+        args.task,
+        args.selected_features
     )
