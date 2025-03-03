@@ -16,6 +16,8 @@ VISUALIZATION_OUTPUT_Regression = "../visualization/regression/"
 
 COLS_TO_DROP_FRAGIRE18_FRIED = [
     "Foldername",
+    "Frailty_State_GFST",
+    "Fried_State",
     "Frailty_Score_FRAGIRE18_SQ001",
     "Fried_Score_FRIED_TOTAL_Version_1",
     "FRIED - ITEM PERTE DE POIDS -  mesuré",
@@ -34,3 +36,22 @@ COLS_TO_DROP_FRAGIRE18_FRIED = [
 
 # Drop folow-up columns
 COLS_TO_DROP_FOLLOW_UP_PATTERN = "*_follow-up"
+
+
+# Chutes
+COLS_TO_DROP_CHUTES = [
+    "Chute_1",
+    "Chute_2",
+    "Chute_3",
+    "Chute_4",
+    "Chute_5",
+    "Chute_6",
+    "Nombre_de_chutes_suivi_mensuel_pendant_6_mois",
+    "FROPCOM0001 SCORE",
+    "FROPCOM0001",
+    "Foldername"
+]
+
+# Target variables for falls classification
+TARGET_CHUTE_6M = "chute_6_m"    # 0: no falls, 1: >=1 faller
+TARGET_CHUTE_12M = "chute_12_m"  # 0: no falls, 1: >=2 faller

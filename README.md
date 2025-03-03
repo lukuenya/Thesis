@@ -116,22 +116,22 @@ All experiments can be reproduced using the provided code:
 1. Configure parameters in `config.py`
 2. Run :
       - `cd src`
-      - `python get_feature_importances.py --score_type FRIED --model_name lightgbm`
-      - `python get_feature_importances.py --score_type FRIED --model_name xgboost`
-      - `python get_feature_importances.py --score_type FRIED --model_name catboost`
-      - `python get_feature_importances.py --score_type FRAGIRE18 --model_name lightgbm`
-      - `python get_feature_importances.py --score_type FRAGIRE18 --model_name xgboost`
-      - `python get_feature_importances.py --score_type FRAGIRE18 --model_name catboost`
+      - `python get_feature_importances.py --score_type FRIED --model_name ... --task ...`
+
+      - `python get_feature_importances.py --score_type FRAGIRE18 --model_name ... --task ...`
+
    for dimensionality reduction based on each model feature importances.
+      - Replace the ... in --model_name by 'lightgbm', 'xgboost', or 'catboost'
+      - Replace the ... in --task by 'classification' or 'regression'
+
 3. Run :
-      - `python feature_selection.py --score_type FRIED --task classification --threshold_percentile 20`
-      - `python feature_selection.py --score_type FRAGIRE18 --task classification --threshold_percentile 20`
-      - `python feature_selection.py --score_type FRIED --task regression --threshold_percentile 20`
-      - `python feature_selection.py --score_type FRAGIRE18 --task regression --threshold_percentile 20`
+      - `python feature_selection.py --score_type FRIED --threshold_percentile 20 --task ...`
+      - `python feature_selection.py --score_type FRAGIRE18 --threshold_percentile 20 --task ...`
    to aggregate feature importances and select top features for each score type.
+
 4. Train final models with selected features:
-      - `python train_optimize.py --score_type FRIED --model_name lightgbm --selected_features`
-      - `python train_optimize.py --score_type FRAGIRE18 --model_name lightgbm --selected_features`
+      - `python train_optimize.py --score_type FRIED --model_name ... --selected_features --task ...`
+      - `python train_optimize.py --score_type FRAGIRE18 --model_name ... --selected_features --task ...`
 
 # DEPENDENCIES
 Required Python packages are listed in `requirements.txt`

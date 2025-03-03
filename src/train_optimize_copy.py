@@ -18,12 +18,15 @@ from xgboost import XGBClassifier, XGBRegressor
 from lightgbm import LGBMClassifier, LGBMRegressor
 from catboost import CatBoostClassifier, CatBoostRegressor
 
+from imblearn.pipeline import Pipeline as ImbPipeline
+from imblearn.over_sampling import SMOTE
+
 import config
 import data_loader
 
 
 # -----------------------------------------------------------------------------
-# PLOTTING FUNCTIONS (same style as you had)
+# PLOTTING FUNCTIONS
 # -----------------------------------------------------------------------------
 
 def plot_roc_curves(y_true, y_pred_proba, score_type, model_name, selected_features=False):
@@ -343,52 +346,84 @@ def objective(trial, X, y, model_name, task):
     """Optuna objective function for hyperparameter optimization via CV."""
     params = get_hyperparameter_space(trial, model_name, task)
     
-    # Initialize model based on task and model name
-    model = initialize_model(model_name, task, params)
-    
-    # Prepare cross-validation
     if task == 'classification':
-        cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
-    else:
-        cv = KFold(n_splits=5, shuffle=True, random_state=42)
-    
-    cv_scores = []
-    
-    # Perform cross-validation
-    for fold, (train_idx, val_idx) in enumerate(cv.split(X, y)):
-        X_train_fold, X_val_fold = X[train_idx], X[val_idx]
-        y_train_fold, y_val_fold = y[train_idx], y[val_idx]
+        # For classification, round the target values and convert to int
+        y_int = np.round(y).astype(int)
         
-        # Check if validation fold has only one class
-        if task == 'classification' and len(np.unique(y_val_fold)) == 1:
-            continue  # Skip this fold
+        # Get class distribution for fold calculation
+        _, counts = np.unique(y_int, return_counts=True)
         
-        # Train model
-        if task == 'classification':
-            model.fit(
-                X_train_fold, y_train_fold,
-                eval_set=[(X_val_fold, y_val_fold)]
-            )
-            # For classification, maximize ROC AUC
-            y_val_pred_proba = model.predict_proba(X_val_fold)[:, 1]
-            fold_score = roc_auc_score(y_val_fold, y_val_pred_proba)
+        if model_name == 'lightgbm':
+            model = LGBMClassifier(**params)
+        elif model_name == 'xgboost':
+            model = XGBClassifier(**params)
         else:
-            model.fit(
-                X_train_fold, y_train_fold,
-                eval_set=[(X_val_fold, y_val_fold)],
-                verbose=False
-            )
-            # For regression, minimize RMSE
-            y_val_pred = model.predict(X_val_fold)
-            fold_score = -np.sqrt(mean_squared_error(y_val_fold, y_val_pred))  # Negative because Optuna minimizes
+            model = CatBoostClassifier(**params)
         
-        cv_scores.append(fold_score)
+        # Count samples in minority class
+        min_samples = min(np.bincount(y_int))
+        
+        if min_samples < 3:
+            # If we have less than 3 samples in any class, skip SMOTE
+            pipeline = model
+        else:
+            # Use k_neighbors=2 (minimum possible) for small datasets
+            pipeline = ImbPipeline([
+                ('smote', SMOTE(k_neighbors=2, random_state=42)),
+                ('clf', model)
+            ])
+            
+        # Ensure we have at least 2 samples per class in each fold
+        n_splits = min(5, min(counts))
+        cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
+    else:
+        if model_name == 'lightgbm':
+            model = LGBMRegressor(**params)
+        elif model_name == 'xgboost':
+            model = XGBRegressor(**params)
+        else:
+            model = CatBoostRegressor(**params)
+        pipeline = model
+        cv = KFold(n_splits=5, shuffle=True, random_state=42)
+
+    cv_scores = []
+    skipped_folds = 0
     
-    # If no valid folds were found (all folds had only one class)
+    for fold_idx, (train_idx, val_idx) in enumerate(cv.split(X, y_int if task == 'classification' else y)):
+        X_train_fold, X_val_fold = X[train_idx], X[val_idx]
+        y_train_fold = y_int[train_idx] if task == 'classification' else y[train_idx]
+        y_val_fold = y_int[val_idx] if task == 'classification' else y[val_idx]
+        
+        if task == 'classification':
+            # Check if validation fold has at least one sample of each class
+            if len(np.unique(y_val_fold)) == 1:
+                print(f"Skipping fold {fold_idx + 1} due to single-class validation set")
+                skipped_folds += 1
+                continue
+        
+        try:
+            pipeline.fit(X_train_fold, y_train_fold)
+            
+            if task == 'classification':
+                y_val_pred_proba = pipeline.predict_proba(X_val_fold)[:, 1]
+                fold_score = roc_auc_score(y_val_fold, y_val_pred_proba)
+            else:
+                y_val_pred = pipeline.predict(X_val_fold)
+                fold_score = -np.sqrt(mean_squared_error(y_val_fold, y_val_pred))
+            
+            cv_scores.append(fold_score)
+            print(f"Fold {fold_idx + 1} score: {fold_score:.4f}")
+            
+        except Exception as e:
+            print(f"Error in fold {fold_idx + 1}: {str(e)}")
+            skipped_folds += 1
+            continue
+    
     if len(cv_scores) == 0:
-        raise ValueError("No valid folds found - all folds contain only one class. The dataset might be too imbalanced.")
+        print(f"Warning: All {n_splits} folds were skipped. Check data distribution.")
+        # Return a very poor score to guide optimization away from these parameters
+        return float('-inf') if task == 'classification' else float('inf')
     
-    # Return mean CV score
     return np.mean(cv_scores)
 
 
@@ -459,61 +494,80 @@ def optimize_model(score_type, n_trials, model_name, task='classification', sele
     best_params = study.best_params
     print(f"\nBest parameters: {best_params}")
     
-    # Train final model with best parameters
+    # Final model training with integrated oversampling pipeline for classification
     if task == 'classification':
+        # For classification, round the target values and convert to int
+        y_train_int = np.round(y_train).astype(int)
         if model_name == 'lightgbm':
             final_model = LGBMClassifier(**best_params)
         elif model_name == 'xgboost':
             final_model = XGBClassifier(**best_params)
-        else:  # catboost
+        else:
             final_model = CatBoostClassifier(**best_params)
+        
+        # Count samples in minority class
+        min_samples = min(np.bincount(y_train_int))
+        
+        if min_samples < 3:
+            # If we have less than 3 samples in any class, skip SMOTE
+            pipeline_final = final_model
+        else:
+            # Use k_neighbors=2 (minimum possible) for small datasets
+            pipeline_final = ImbPipeline([
+                ('smote', SMOTE(k_neighbors=2, random_state=42)),
+                ('clf', final_model)
+            ])
+        
+        pipeline_final.fit(X_train, y_train_int)
+        
+        model_output = config.MODEL_OUTPUT_classification
+        suffix = '_selected' if selected_features else ''
+        model_path = os.path.join(
+            model_output,
+            f"{model_name}_{score_type.lower()}{suffix}.joblib"
+        )
+        joblib.dump(pipeline_final, model_path)
+        print(f"Model pipeline saved to {model_path}")
+        
+        y_pred_proba = pipeline_final.predict_proba(X_test)[:, 1]
+        optimal_threshold, _ = find_optimal_threshold(y_test, y_pred_proba)
+        y_pred = (y_pred_proba >= optimal_threshold).astype(int)
+        
+        plot_roc_curves(y_test, y_pred_proba, score_type, model_name, selected_features)
+        print("\nClassification Report:")
+        print(classification_report(y_test, y_pred))
     else:
         if model_name == 'lightgbm':
             final_model = LGBMRegressor(**best_params)
         elif model_name == 'xgboost':
             final_model = XGBRegressor(**best_params)
-        else:  # catboost
+        else:
             final_model = CatBoostRegressor(**best_params)
-    
-    # Fit final model
-    final_model.fit(X_train, y_train)
-    
-    # Save model
-    model_output = (config.MODEL_OUTPUT_classification if task == 'classification' 
-                   else config.MODEL_OUTPUT_regression)
-    suffix = '_selected' if selected_features else ''
-    model_path = os.path.join(
-        model_output,
-        f"{model_name}_{score_type.lower()}{suffix}.joblib"
-    )
-    joblib.dump(final_model, model_path)
-    print(f"Model saved to {model_path}")
-    
-    # Make predictions
-    if task == 'classification':
-        y_pred_proba = final_model.predict_proba(X_test)[:, 1]
-        optimal_threshold, _ = find_optimal_threshold(y_test, y_pred_proba)
-        y_pred = (y_pred_proba >= optimal_threshold).astype(int)
         
-        # Generate and save plots
-        plot_roc_curves(y_test, y_pred_proba, score_type, model_name, selected_features)
-        # plot_precision_recall_curve(y_test, y_pred_proba, score_type, model_name, selected_features)
-        # plot_confusion_matrix_custom(y_test, y_pred, score_type, model_name, selected_features)
-        # plot_threshold_impact(y_test, y_pred_proba, score_type, model_name, selected_features)
+        final_model.fit(X_train, y_train)
+        model_output = config.MODEL_OUTPUT_regression
+        suffix = '_selected' if selected_features else ''
+        model_path = os.path.join(
+            model_output,
+            f"{model_name}_{score_type.lower()}{suffix}.joblib"
+        )
+        joblib.dump(final_model, model_path)
+        print(f"Model saved to {model_path}")
         
-        # Print classification metrics
-        print("\nClassification Report:")
-        print(classification_report(y_test, y_pred))
-    else:  # regression
         y_pred = final_model.predict(X_test)
         metrics = plot_regression_metrics(y_test, y_pred, score_type, model_name, selected_features)
         print("\nRegression Metrics:")
         print(f"RMSE: {metrics['rmse']:.3f}")
-    
-    # Plot and save feature importance
-    plot_feature_importance(final_model, feature_names, score_type, model_name, task, selected_features)
-    
-    return final_model
+
+    # Plot feature importance using the classifier from the pipeline (for classification)
+    if task == 'classification':
+        clf_for_importance = pipeline_final.named_steps['clf']
+    else:
+        clf_for_importance = final_model
+    plot_feature_importance(clf_for_importance, feature_names, score_type, model_name, task, selected_features)
+
+    return final_model if task == 'regression' else pipeline_final
+
 
 # -----------------------------------------------------------------------------
 # CLI ENTRY

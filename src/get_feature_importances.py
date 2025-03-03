@@ -131,6 +131,72 @@ MODEL_PARAMS = {
                 'random_strength': 1.6404371699627177e-08
             }
         }
+    },
+    'CHUTE_6M': {
+        'classification': {
+            'lightgbm': {
+                'reg_alpha': 1e-5,
+                'reg_lambda': 1e-8,
+                'n_estimators': 200,
+                'num_leaves': 31,
+                'max_depth': 6,
+                'learning_rate': 0.01,
+                'boosting_type': 'dart',
+                'is_unbalance': True
+            },
+            'xgboost': {
+                'n_estimators': 200,
+                'alpha': 1.0,
+                'max_depth': 6,
+                'eta': 0.1,
+                'min_child_weight': 1,
+                'subsample': 0.8,
+                'colsample_bytree': 0.8,
+                'scale_pos_weight': 1
+            },
+            'catboost': {
+                'iterations': 200,
+                'depth': 6,
+                'learning_rate': 0.1,
+                'l2_leaf_reg': 3.0,
+                'bagging_temperature': 1.0,
+                'random_strength': 1e-8,
+                'auto_class_weights': 'Balanced'
+            }
+        }
+    },
+    'CHUTE_12M': {
+        'classification': {
+            'lightgbm': {
+                'reg_alpha': 1e-5,
+                'reg_lambda': 1e-8,
+                'n_estimators': 200,
+                'num_leaves': 31,
+                'max_depth': 6,
+                'learning_rate': 0.01,
+                'boosting_type': 'dart',
+                'is_unbalance': True
+            },
+            'xgboost': {
+                'n_estimators': 200,
+                'alpha': 1.0,
+                'max_depth': 6,
+                'eta': 0.1,
+                'min_child_weight': 1,
+                'subsample': 0.8,
+                'colsample_bytree': 0.8,
+                'scale_pos_weight': 1
+            },
+            'catboost': {
+                'iterations': 200,
+                'depth': 6,
+                'learning_rate': 0.1,
+                'l2_leaf_reg': 3.0,
+                'bagging_temperature': 1.0,
+                'random_strength': 1e-8,
+                'auto_class_weights': 'Balanced'
+            }
+        }
     }
 }
 
@@ -207,13 +273,14 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='Get feature importances from models')
     parser.add_argument('--score_type', type=str, default='FRIED',
-                      help='Type of score to predict (FRIED or FRAGIRE18)')
+                      choices=['FRIED', 'FRAGIRE18', 'CHUTE_6M', 'CHUTE_12M'],
+                      help='Score type to use for feature importances')
     parser.add_argument('--model_name', type=str, default='lightgbm',
                       choices=['lightgbm', 'xgboost', 'catboost'],
-                      help='Model to use for feature importance calculation')
+                      help='Model to use for feature importances')
     parser.add_argument('--task', type=str, default='classification',
                       choices=['classification', 'regression'],
-                      help='Type of task (classification or regression)')
+                      help='Task type (classification or regression)')
     args = parser.parse_args()
     
     get_feature_importances(args.score_type, args.model_name, args.task)
