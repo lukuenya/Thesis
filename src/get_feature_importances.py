@@ -1,206 +1,95 @@
 import os
 import pandas as pd
 import numpy as np
-from lightgbm import LGBMClassifier, LGBMRegressor
-from xgboost import XGBClassifier, XGBRegressor
-from catboost import CatBoostClassifier, CatBoostRegressor
-from sklearn.model_selection import StratifiedKFold, KFold
+from lightgbm import LGBMClassifier
+from xgboost import XGBClassifier
+from catboost import CatBoostClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import StratifiedKFold
 import data_loader
 import config
 
 # Default parameters for each model and score type
 MODEL_PARAMS = {
     'FRIED': {
-        'classification': {
-            'lightgbm': {
-                'reg_alpha': 1.6266623378395724e-05,
-                'reg_lambda': 2.7803224284458052e-08,
-                'n_estimators': 209,
-                'num_leaves': 349,
-                'max_depth': 10,
-                'learning_rate': 0.007303587470843107,
-                'boosting_type': 'dart',
-                'is_unbalance': True
-            },
-            'xgboost': {
-                'n_estimators': 151,
-                'alpha': 1.2895984520282453,
-                'max_depth': 7,
-                'eta': 0.22888318411754455,
-                'min_child_weight': 0,
-                'subsample': 0.7547159187812194,
-                'colsample_bytree': 0.8713219606921598,
-                'scale_pos_weight': 4.59375
-            },
-            'catboost': {
-                'iterations': 297,
-                'depth': 4,
-                'learning_rate': 0.1126205922460068,
-                'l2_leaf_reg': 2.408872205466443,
-                'bagging_temperature': 0.9718611384971728,
-                'random_strength': 1.6404371699627177e-08,
-                'auto_class_weights': 'Balanced'
-            }
+        'lightgbm': {
+            'reg_alpha': 1.6266623378395724e-05,
+            'reg_lambda': 2.7803224284458052e-08,
+            'n_estimators': 209,
+            'num_leaves': 349,
+            'max_depth': 10,
+            'learning_rate': 0.007303587470843107,
+            'boosting_type': 'dart',
+            'is_unbalance': True
         },
-        'regression': {
-            'lightgbm': {
-                'reg_alpha': 1.6266623378395724e-05,
-                'reg_lambda': 2.7803224284458052e-08,
-                'n_estimators': 209,
-                'num_leaves': 349,
-                'max_depth': 10,
-                'learning_rate': 0.007303587470843107,
-                'boosting_type': 'dart'
-            },
-            'xgboost': {
-                'n_estimators': 151,
-                'alpha': 1.2895984520282453,
-                'max_depth': 7,
-                'eta': 0.22888318411754455,
-                'min_child_weight': 0,
-                'subsample': 0.7547159187812194,
-                'colsample_bytree': 0.8713219606921598
-            },
-            'catboost': {
-                'iterations': 297,
-                'depth': 4,
-                'learning_rate': 0.1126205922460068,
-                'l2_leaf_reg': 2.408872205466443,
-                'bagging_temperature': 0.9718611384971728,
-                'random_strength': 1.6404371699627177e-08
-            }
+        'xgboost': {
+            'n_estimators': 151,
+            'alpha': 1.2895984520282453,
+            'max_depth': 7,
+            'eta': 0.22888318411754455,
+            'min_child_weight': 0,
+            'subsample': 0.7547159187812194,
+            'colsample_bytree': 0.8713219606921598,
+            'scale_pos_weight': 4.59375
+        },
+        'catboost': {
+            'iterations': 297,
+            'depth': 4,
+            'learning_rate': 0.1126205922460068,
+            'l2_leaf_reg': 2.408872205466443,
+            'bagging_temperature': 0.9718611384971728,
+            'random_strength': 1.6404371699627177e-08,
+            'auto_class_weights': 'Balanced'
+        },
+        'randomforest': {
+            'n_estimators': 200,
+            'max_depth': 10,
+            'min_samples_split': 2,
+            'min_samples_leaf': 1,
+            'class_weight': 'balanced'
         }
     },
     'FRAGIRE18': {
-        'classification': {
-            'lightgbm': {
-                'reg_alpha': 5.504139817600005,
-                'reg_lambda': 1.2579874764708709e-08,
-                'n_estimators': 265,
-                'num_leaves': 364,
-                'max_depth': 7,
-                'learning_rate': 0.09870445582078947,
-                'boosting_type': 'dart',
-                'is_unbalance': True
-            },
-            'xgboost': {
-                'n_estimators': 151,
-                'alpha': 1.2895984520282453,
-                'max_depth': 7,
-                'eta': 0.22888318411754455,
-                'min_child_weight': 0,
-                'subsample': 0.7547159187812194,
-                'colsample_bytree': 0.8713219606921598,
-                'scale_pos_weight': 4.59375
-            },
-            'catboost': {
-                'iterations': 297,
-                'depth': 4,
-                'learning_rate': 0.1126205922460068,
-                'l2_leaf_reg': 2.408872205466443,
-                'bagging_temperature': 0.9718611384971728,
-                'random_strength': 1.6404371699627177e-08,
-                'auto_class_weights': 'Balanced'
-            }
+        'lightgbm': {
+            'reg_alpha': 1.6266623378395724e-05,
+            'reg_lambda': 2.7803224284458052e-08,
+            'n_estimators': 209,
+            'num_leaves': 349,
+            'max_depth': 10,
+            'learning_rate': 0.007303587470843107,
+            'boosting_type': 'dart',
+            'is_unbalance': True
         },
-        'regression': {
-            'lightgbm': {
-                'reg_alpha': 5.504139817600005,
-                'reg_lambda': 1.2579874764708709e-08,
-                'n_estimators': 265,
-                'num_leaves': 364,
-                'max_depth': 7,
-                'learning_rate': 0.09870445582078947,
-                'boosting_type': 'dart'
-            },
-            'xgboost': {
-                'n_estimators': 151,
-                'alpha': 1.2895984520282453,
-                'max_depth': 7,
-                'eta': 0.22888318411754455,
-                'min_child_weight': 0,
-                'subsample': 0.7547159187812194,
-                'colsample_bytree': 0.8713219606921598
-            },
-            'catboost': {
-                'iterations': 297,
-                'depth': 4,
-                'learning_rate': 0.1126205922460068,
-                'l2_leaf_reg': 2.408872205466443,
-                'bagging_temperature': 0.9718611384971728,
-                'random_strength': 1.6404371699627177e-08
-            }
-        }
-    },
-    'CHUTE_6M': {
-        'classification': {
-            'lightgbm': {
-                'reg_alpha': 1e-5,
-                'reg_lambda': 1e-8,
-                'n_estimators': 200,
-                'num_leaves': 31,
-                'max_depth': 6,
-                'learning_rate': 0.01,
-                'boosting_type': 'dart',
-                'is_unbalance': True
-            },
-            'xgboost': {
-                'n_estimators': 200,
-                'alpha': 1.0,
-                'max_depth': 6,
-                'eta': 0.1,
-                'min_child_weight': 1,
-                'subsample': 0.8,
-                'colsample_bytree': 0.8,
-                'scale_pos_weight': 1
-            },
-            'catboost': {
-                'iterations': 200,
-                'depth': 6,
-                'learning_rate': 0.1,
-                'l2_leaf_reg': 3.0,
-                'bagging_temperature': 1.0,
-                'random_strength': 1e-8,
-                'auto_class_weights': 'Balanced'
-            }
-        }
-    },
-    'CHUTE_12M': {
-        'classification': {
-            'lightgbm': {
-                'reg_alpha': 1e-5,
-                'reg_lambda': 1e-8,
-                'n_estimators': 200,
-                'num_leaves': 31,
-                'max_depth': 6,
-                'learning_rate': 0.01,
-                'boosting_type': 'dart',
-                'is_unbalance': True
-            },
-            'xgboost': {
-                'n_estimators': 200,
-                'alpha': 1.0,
-                'max_depth': 6,
-                'eta': 0.1,
-                'min_child_weight': 1,
-                'subsample': 0.8,
-                'colsample_bytree': 0.8,
-                'scale_pos_weight': 1
-            },
-            'catboost': {
-                'iterations': 200,
-                'depth': 6,
-                'learning_rate': 0.1,
-                'l2_leaf_reg': 3.0,
-                'bagging_temperature': 1.0,
-                'random_strength': 1e-8,
-                'auto_class_weights': 'Balanced'
-            }
+        'xgboost': {
+            'n_estimators': 151,
+            'alpha': 1.2895984520282453,
+            'max_depth': 7,
+            'eta': 0.22888318411754455,
+            'min_child_weight': 0,
+            'subsample': 0.7547159187812194,
+            'colsample_bytree': 0.8713219606921598,
+            'scale_pos_weight': 4.59375
+        },
+        'catboost': {
+            'iterations': 297,
+            'depth': 4,
+            'learning_rate': 0.1126205922460068,
+            'l2_leaf_reg': 2.408872205466443,
+            'bagging_temperature': 0.9718611384971728,
+            'random_strength': 1.6404371699627177e-08,
+            'auto_class_weights': 'Balanced'
+        },
+        'randomforest': {
+            'n_estimators': 200,
+            'max_depth': 10,
+            'min_samples_split': 2,
+            'min_samples_leaf': 1,
+            'class_weight': 'balanced'
         }
     }
 }
 
-def get_feature_importances(score_type, model_name, task='classification'):
+def get_feature_importances(score_type, model_name):
     """
     Get feature importances from a model using cross-validation
     
@@ -209,78 +98,101 @@ def get_feature_importances(score_type, model_name, task='classification'):
     score_type : str
         Type of score to predict (FRIED or FRAGIRE18)
     model_name : str
-        Name of the model to use (lightgbm, xgboost, or catboost)
-    task : str
-        Type of task (classification or regression)
+        Name of the model to use (lightgbm, xgboost, catboost, or randomforest)
     """
     # Load data
-    X, y, feature_names = data_loader.load_data(score_type, task)
+    X, y = data_loader.load_data(score_type)
     
-    # Initialize model with parameters
-    if task == 'classification':
-        if model_name == 'lightgbm':
-            model = LGBMClassifier(**MODEL_PARAMS[score_type][task]['lightgbm'])
-        elif model_name == 'xgboost':
-            model = XGBClassifier(**MODEL_PARAMS[score_type][task]['xgboost'])
-        else:  # catboost
-            model = CatBoostClassifier(**MODEL_PARAMS[score_type][task]['catboost'])
-        cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
-    else:  # regression
-        if model_name == 'lightgbm':
-            model = LGBMRegressor(**MODEL_PARAMS[score_type][task]['lightgbm'])
-        elif model_name == 'xgboost':
-            model = XGBRegressor(**MODEL_PARAMS[score_type][task]['xgboost'])
-        else:  # catboost
-            model = CatBoostRegressor(**MODEL_PARAMS[score_type][task]['catboost'])
-        cv = KFold(n_splits=5, shuffle=True, random_state=42)
+    # Convert to numpy arrays
+    if isinstance(X, pd.DataFrame):
+        feature_names = X.columns.tolist()
+        X = X.values
+    else:
+        feature_names = [f"feature_{i}" for i in range(X.shape[1])]
     
-    # Get feature importances using cross-validation
+    if isinstance(y, pd.Series):
+        y = y.values
+        
+    # Initialize model
+    if model_name == 'lightgbm':
+        model = LGBMClassifier(**MODEL_PARAMS[score_type][model_name], random_state=42)
+    elif model_name == 'xgboost':
+        model = XGBClassifier(**MODEL_PARAMS[score_type][model_name], random_state=42)
+    elif model_name == 'catboost':
+        model = CatBoostClassifier(**MODEL_PARAMS[score_type][model_name], random_state=42, verbose=0)
+    elif model_name == 'randomforest':
+        model = RandomForestClassifier(**MODEL_PARAMS[score_type][model_name], random_state=42, n_jobs=-1)
+    else:
+        raise ValueError(f"Unknown model name: {model_name}")
+    
+    # Cross-validation (5-fold)
+    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
     importances = []
-    for train_idx, val_idx in cv.split(X, y):
+    
+    for train_idx, val_idx in skf.split(X, y):
         X_train, X_val = X[train_idx], X[val_idx]
         y_train, y_val = y[train_idx], y[val_idx]
         
-        model.fit(X_train, y_train,
-                eval_set=[(X_val, y_val)])
+        # Train model
+        model.fit(X_train, y_train)
         
-        importances.append(model.feature_importances_)
+        # Get feature importances
+        if model_name == 'lightgbm':
+            imp = model.feature_importances_
+        elif model_name == 'xgboost':
+            imp = model.feature_importances_
+        elif model_name == 'catboost':
+            imp = model.feature_importances_
+        elif model_name == 'randomforest':
+            imp = model.feature_importances_
+        
+        importances.append(imp)
     
-    # Calculate mean and std of feature importances
-    importances = np.array(importances)
-    importance_mean = importances.mean(axis=0)
-    importance_std = importances.std(axis=0)
+    # Average feature importances
+    mean_importances = np.mean(importances, axis=0)
     
-    # Create DataFrame with feature importances
+    # Create DataFrame
     importance_df = pd.DataFrame({
-        'Feature': feature_names,
-        'Importance': importance_mean,
-        'Importance_STD': importance_std
-    }).sort_values('Importance', ascending=False)
+        'feature': feature_names,
+        'importance': mean_importances
+    })
     
-    # Save feature importances
-    output_dir = (config.FEATURES_IMPORTANCE_OUTPUT_classification 
-                 if task == 'classification' 
-                 else config.FEATURES_IMPORTANCE_OUTPUT_regression)
-    os.makedirs(output_dir, exist_ok=True)
-    importance_df.to_excel(
-        os.path.join(output_dir, f"{model_name}_{score_type.lower()}_feature_importances.xlsx"),
-        index=False
+    # Sort by importance
+    importance_df = importance_df.sort_values('importance', ascending=False)
+    
+    # Create output directory if it doesn't exist
+    os.makedirs(config.FEATURE_IMPORTANCE_DIR, exist_ok=True)
+    
+    # Save to CSV
+    output_file = os.path.join(
+        config.FEATURE_IMPORTANCE_DIR,
+        f"importance_{model_name}_{score_type.lower()}_classification.csv"
     )
+    importance_df.to_csv(output_file, index=False)
+    print(f"Feature importances saved to {output_file}")
     
+    # Save top features to a text file
+    top_features = importance_df['feature'].head(50).tolist()
+    top_features_file = os.path.join(
+        config.FEATURE_IMPORTANCE_DIR,
+        f"selected_features_{score_type.lower()}_classification.txt"
+    )
+    with open(top_features_file, 'w') as f:
+        for feature in top_features:
+            f.write(f"{feature}\n")
+    
+    print(f"Top 50 features saved to {top_features_file}")
     return importance_df
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='Get feature importances from models')
     parser.add_argument('--score_type', type=str, default='FRIED',
-                      choices=['FRIED', 'FRAGIRE18', 'CHUTE_6M', 'CHUTE_12M'],
-                      help='Score type to use for feature importances')
+                      choices=['FRIED', 'FRAGIRE18'],
+                      help='Score type to predict')
     parser.add_argument('--model_name', type=str, default='lightgbm',
-                      choices=['lightgbm', 'xgboost', 'catboost'],
-                      help='Model to use for feature importances')
-    parser.add_argument('--task', type=str, default='classification',
-                      choices=['classification', 'regression'],
-                      help='Task type (classification or regression)')
+                      choices=['lightgbm', 'xgboost', 'catboost', 'randomforest'],
+                      help='Model to use')
     args = parser.parse_args()
     
-    get_feature_importances(args.score_type, args.model_name, args.task)
+    get_feature_importances(args.score_type, args.model_name)

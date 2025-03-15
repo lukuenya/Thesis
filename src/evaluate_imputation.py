@@ -6,61 +6,81 @@ This script compares model performance with and without the improved imputation.
 import os
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import cross_val_score, StratifiedKFold, KFold
-from sklearn.metrics import make_scorer, roc_auc_score, mean_squared_error
+from sklearn.model_selection import KFold
+from sklearn.metrics import roc_auc_score
 import lightgbm as lgb
-from data_loader import load_data
-import config
+from data_loader import load_raw_data, preprocess_data
+from config import TARGET_COLUMNS_DICT
 
-def evaluate_target(score_type, task, n_splits=5):
+def evaluate_target(score_type, task='classification'):
     """
-    Evaluate model performance for a specific target variable.
-    Uses cross-validation to get robust performance estimates.
+    Evaluate imputation performance on a specific target variable.
+    
+    Parameters:
+    -----------
+    score_type : str
+        The frailty score type ('FRIED' or 'FRAGIRE18')
+    task : str
+        The task type ('classification' only - regression removed)
+    
+    Returns:
+    --------
+    scores : np.array
+        Cross-validation scores (ROC AUC for classification)
     """
-    print(f"\nEvaluating {score_type} ({task})...")
+    # Load raw data with missing values
+    raw_data = load_raw_data()
     
-    # Load data
-    X, y, feature_names = load_data(score_type, task)
+    # Get target column
+    target_col = TARGET_COLUMNS_DICT[score_type][task]
     
-    # Initialize model (using LightGBM for quick evaluation)
-    if task == 'classification':
-        model = lgb.LGBMClassifier(
-            n_estimators=100,
-            learning_rate=0.1,
-            num_leaves=31,
-            random_state=42
-        )
-        scoring = 'roc_auc'
-        cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
-    else:
-        model = lgb.LGBMRegressor(
-            n_estimators=100,
-            learning_rate=0.1,
-            num_leaves=31,
-            random_state=42
-        )
-        scoring = 'neg_root_mean_squared_error'
-        cv = KFold(n_splits=n_splits, shuffle=True, random_state=42)
+    # Mask for rows with non-missing target
+    valid_mask = ~raw_data[target_col].isna()
     
-    # Perform cross-validation
-    scores = cross_val_score(model, X, y, scoring=scoring, cv=cv)
+    # Get data with preprocessing (including imputation)
+    X, y = preprocess_data(raw_data, score_type, task)
     
-    # Print results
-    if task == 'classification':
-        print(f"ROC AUC scores: {scores}")
-        print(f"Mean ROC AUC: {scores.mean():.3f} (+/- {scores.std() * 2:.3f})")
-    else:
-        rmse_scores = -scores  # Convert negative RMSE back to positive
-        print(f"RMSE scores: {rmse_scores}")
-        print(f"Mean RMSE: {rmse_scores.mean():.3f} (+/- {rmse_scores.std() * 2:.3f})")
+    # Only keep rows with non-missing targets in the original data
+    X = X[valid_mask]
+    y = y[valid_mask]
     
-    return scores
+    # Cross-validation
+    kf = KFold(n_splits=5, shuffle=True, random_state=42)
+    scores = []
+    
+    for train_idx, test_idx in kf.split(X):
+        X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
+        y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
+        
+        # Train model
+        if task == 'classification':
+            model = lgb.LGBMClassifier(
+                objective='binary', 
+                random_state=42,
+                n_estimators=100,
+                is_unbalance=True
+            )
+        
+        model.fit(X_train, y_train)
+        
+        # Evaluate
+        if task == 'classification':
+            y_pred = model.predict_proba(X_test)[:, 1]
+            score = roc_auc_score(y_test, y_pred)
+        
+        scores.append(score)
+    
+    return np.array(scores)
 
 def main():
     """
-    Evaluate all target variables:
-    - FRIED (classification and regression)
-    - FRAGIRE18 (classification and regression)
+    Main function to evaluate imputation performance.
+    
+    For each target variable:
+    - FRIED (classification only)
+    - FRAGIRE18 (classification only)
+    
+    We train models on the imputed data and report cross-validation scores.
     """
     results = {}
     
@@ -68,34 +88,11 @@ def main():
     results['FRIED_classification'] = evaluate_target('FRIED', 'classification')
     results['FRAGIRE18_classification'] = evaluate_target('FRAGIRE18', 'classification')
     
-    # Regression tasks
-    results['FRIED_regression'] = evaluate_target('FRIED', 'regression')
-    results['FRAGIRE18_regression'] = evaluate_target('FRAGIRE18', 'regression')
-    
-    # Save results
-    results_df = pd.DataFrame({
-        'Target': ['FRIED_cls', 'FRAGIRE18_cls', 'FRIED_reg', 'FRAGIRE18_reg'],
-        'Mean Score': [
-            results['FRIED_classification'].mean(),
-            results['FRAGIRE18_classification'].mean(),
-            -results['FRIED_regression'].mean(),  # Convert back to positive RMSE
-            -results['FRAGIRE18_regression'].mean()
-        ],
-        'Std Dev': [
-            results['FRIED_classification'].std(),
-            results['FRAGIRE18_classification'].std(),
-            results['FRIED_regression'].std(),
-            results['FRAGIRE18_regression'].std()
-        ]
-    })
-    
-    print("\nSummary of Results:")
-    print(results_df)
-    
-    # Save to CSV
-    os.makedirs('results', exist_ok=True)
-    results_df.to_csv('results/imputation_evaluation.csv', index=False)
-    print("\nResults saved to results/imputation_evaluation.csv")
+    print("\nImputation Evaluation Results:")
+    print("-------------------------------")
+    print("Classification (ROC AUC, higher is better):")
+    print(f"  FRIED: {results['FRIED_classification'].mean():.3f} ± {results['FRIED_classification'].std():.3f}")
+    print(f"  FRAGIRE18: {results['FRAGIRE18_classification'].mean():.3f} ± {results['FRAGIRE18_classification'].std():.3f}")
 
 if __name__ == "__main__":
     main()

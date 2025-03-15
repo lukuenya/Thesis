@@ -112,7 +112,7 @@ All experiments can be reproduced using the provided code:
       - `cd src`
       - `python get_feature_importances.py --score_type FRIED --model_name ... --task ...`
 
-      - `python get_feature_importances.py --score_type FRAGIRE18 --model_name ... --task ...`
+      - `python get_feature_importances.py --score_type FRAGIRE18 --model_name ...`
 
    for dimensionality reduction based on each model feature importances.
       - Replace the ... in --model_name by 'lightgbm', 'xgboost', or 'catboost'
