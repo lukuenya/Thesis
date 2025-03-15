@@ -50,6 +50,10 @@ def load_data(target_score='FRIED', selected_features=False):
     # Drop columns with near-zero variance
     X = preprocessing.drop_near_zero_variance(X)
 
+    # Impute missing values
+    X_imputed, _ = preprocessing.process_imputation(X.values)
+    X = pd.DataFrame(X_imputed, columns=X.columns, index=X.index)
+
     # # Process features - drop highly correlated and non-useful features
     # X, _ = preprocessing.process_features(X)
     
