@@ -1,12 +1,14 @@
 # PROJECT OVERVIEW
 This project is for my master thesis in Data Science. The aim is to develop a machine learning model that (predicts frailty scores - For Regression) or classifies participants as healthy or frail (For Classification) based on both the "FRIED protocol" and the "Expert's Eye". 
-The focus is on understanding the features driving these scores or classes, comparing the two scoring systems or classification models, and identifying their common feature space to improve explainability and clinical utility.
-For easiness purposes, we will use binary classification problem to predict the FRIED and FRAGIRE18 states of frailty: 0 for healthy and 1 for frail. 
+
+The focus is on understanding the features driving these scores or classes (feature importance), comparing the two scoring systems (Expert's Eye vs. FRIED), and identifying their common feature space to improve explainability and clinical utility.
+
+For easiness purposes, we will use binary classification problem to predict the FRIED and FRAGIRE18(Expert's Eye) states of frailty: 0 for non-frail and 1 for frail. 
 
 ## Research Objectives
 1. Develop accurate prediction models for both FRIED and FRAGIRE18 frailty score/class
-2. Compare and contrast these two frailty assessment methods
-3. Identify key features that influence both scoring systems or classification models
+2. Identify key features that influence both scoring systems(feature importance)
+3. Compare and contrast these two frailty assessment methods
 4. Evaluate the clinical applicability and reliability of ML-based frailty assessments
 
 # METHODOLOGY
@@ -15,14 +17,20 @@ For easiness purposes, we will use binary classification problem to predict the 
 - Classification (binary: 0 for healthy and 1 for frail)
    - Score type: FRIED -> 'Fried_State'
    - Score type: FRAGIRE18 -> 'Frailty_State_GFST'
-- Regression (continuous: score value)
+- Regression (continuous: score value) : NOT USED IN THIS PROJECT
    - Score type: FRIED -> 'Fried_Score_FRIED_TOTAL_Version_1'
    - Score type: FRAGIRE18 -> 'Frailty_Score_FRAGIRE18_SQ001'
 
 ## Data Preprocessing
 1. Feature Selection and Engineering
    - Removal of highly correlated features (list in config.py)
-   - Missing values are handled in 'X' are handled natively by models (if applicable) and in 'y' respective rows are dropped.
+   - Missing values :
+      - Option 1 : handled in 'X' by models (if applicable) but in 'y' respective rows are dropped.
+      - Option 2 : imputed by the Cross-validation based KNN imputer.
+   - Class Imbalance :
+      - Option 1 : handled by models (if applicable) by adjusting class weights.
+      - Option 2 : SMOTE + Tomek Links.
+      - Option 3 : Holdout method (80% train, 20% test) with random resampling.
 
 
 2. Data Splitting
@@ -38,24 +46,15 @@ For easiness purposes, we will use binary classification problem to predict the 
 
 ### Models Evaluated
 1. LightGBM
-   - Gradient boosting framework
-   - Leaf-wise tree growth
-
 2. XGBoost
-   - Regularized gradient boosting
-   - Built-in handling of missing values
-   - Second-order gradients
-
 3. CatBoost
-   - Ordered boosting
-   - Reduced overfitting
+4. Random Forest
 
 ### Hyperparameter Optimization
 - Framework: Optuna
 - Optimization metric: 
-   - Classification: ROC AUC and F1-Score
-   - Regression: RMSE
-- Number of trials: 50
+   - Classification: ROC AUC
+- Number of trials: 15
 - Cross-validation: 5-fold
 
 ## Validation Framework
@@ -67,17 +66,13 @@ For easiness purposes, we will use binary classification problem to predict the 
      - ROC AUC
      - ROC curve
      - Precision-Recall curve
-   - Regression:
-     - RMSE
 
 2. **Cross-Validation Strategy**
    - 5-fold Cross-validation
       - Classification: Stratified by class distribution
-      - Regression: K-fold cross-validation
 
 ### Clinical Validation
  - Feature Importance
- - Correlation Analysis
  - Expert Evaluation
 
 # PROJECT STRUCTURE
@@ -93,8 +88,7 @@ For easiness purposes, we will use binary classification problem to predict the 
   - `preprocessing.py`: Data preprocessing
 
 - `models/`: Trained models and parameters
-  - Saved model states
-  - Model parameters
+  - Saved model for later use in notebooks
 
 - `notebooks/`: Jupyter notebooks
   - Exploratory data analysis

@@ -9,6 +9,7 @@ from sklearn.feature_selection import SelectFromModel
 from lightgbm import LGBMClassifier, LGBMRegressor
 from xgboost import XGBClassifier, XGBRegressor
 from catboost import CatBoostClassifier, CatBoostRegressor
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -17,7 +18,7 @@ def load_feature_importances(score_type, task='classification'):
     Load feature importance files for all models
     """
     importances = {}
-    models = ['lightgbm', 'xgboost', 'catboost']
+    models = ['lightgbm', 'xgboost', 'catboost', 'randomforest']
     
     for model in models:
         filepath = os.path.join(
@@ -107,13 +108,15 @@ def main(score_type, task='classification', threshold_percentile=20):
         models = {
             'lightgbm': LGBMClassifier(random_state=42),
             'xgboost': XGBClassifier(random_state=42),
-            'catboost': CatBoostClassifier(random_state=42)
+            'catboost': CatBoostClassifier(random_state=42),
+            'randomforest': RandomForestClassifier(random_state=42, n_jobs=-1)
         }
     else:  # regression
         models = {
             'lightgbm': LGBMRegressor(random_state=42),
             'xgboost': XGBRegressor(random_state=42),
-            'catboost': CatBoostRegressor(random_state=42)
+            'catboost': CatBoostRegressor(random_state=42),
+            'randomforest': RandomForestRegressor(random_state=42, n_jobs=-1)
         }
     
     # Calculate and save feature importances for each model

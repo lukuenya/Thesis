@@ -13,6 +13,10 @@ from sklearn.metrics import (
     confusion_matrix, classification_report, roc_curve, f1_score,
     mean_squared_error, r2_score, mean_absolute_error
 )
+from imblearn.over_sampling import SMOTE
+from imblearn.combine import SMOTETomek
+from imblearn.pipeline import Pipeline as ImbPipeline
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
 from xgboost import XGBClassifier, XGBRegressor
 from lightgbm import LGBMClassifier, LGBMRegressor
@@ -254,6 +258,20 @@ def get_hyperparameter_space(trial, model_name, task):
                 'bagging_temperature': trial.suggest_float('bagging_temperature', 0.0, 1.0),
                 'random_strength': trial.suggest_float('random_strength', 1e-8, 10.0, log=True)
             }
+        elif model_name == "randomforest":
+            return {
+                'random_state': 42,
+                'n_jobs': -1,
+                'class_weight': 'balanced',
+                
+                'n_estimators': trial.suggest_int('n_estimators', 100, 500),
+                'max_depth': trial.suggest_int('max_depth', 3, 20),
+                'min_samples_split': trial.suggest_int('min_samples_split', 2, 20),
+                'min_samples_leaf': trial.suggest_int('min_samples_leaf', 1, 10),
+                'max_features': trial.suggest_categorical('max_features', ['sqrt', 'log2', None]),
+                'bootstrap': trial.suggest_categorical('bootstrap', [True, False]),
+                'criterion': trial.suggest_categorical('criterion', ['gini', 'entropy'])
+            }
         else:
             raise ValueError(f"Unknown model: {model_name}")
     else:
@@ -313,6 +331,19 @@ def get_hyperparameter_space(trial, model_name, task):
                 'bagging_temperature': trial.suggest_float('bagging_temperature', 0.0, 1.0),
                 'random_strength': trial.suggest_float('random_strength', 1e-8, 10.0, log=True)
             }
+        elif model_name == "randomforest":
+            return {
+                'random_state': 42,
+                'n_jobs': -1,
+                
+                'n_estimators': trial.suggest_int('n_estimators', 100, 500),
+                'max_depth': trial.suggest_int('max_depth', 3, 20),
+                'min_samples_split': trial.suggest_int('min_samples_split', 2, 20),
+                'min_samples_leaf': trial.suggest_int('min_samples_leaf', 1, 10),
+                'max_features': trial.suggest_categorical('max_features', ['sqrt', 'log2', None]),
+                'bootstrap': trial.suggest_categorical('bootstrap', [True, False]),
+                'criterion': trial.suggest_categorical('criterion', ['squared_error', 'absolute_error', 'poisson'])
+            }
         else:
             raise ValueError(f"Unknown model: {model_name}")
 
@@ -326,6 +357,8 @@ def initialize_model(model_name, task, params):
             return XGBClassifier(**params)
         elif model_name == "catboost":
             return CatBoostClassifier(**params)
+        elif model_name == "randomforest":
+            return RandomForestClassifier(**params)
         else:
             raise ValueError(f"Unknown model: {model_name}")
     else:
@@ -335,6 +368,8 @@ def initialize_model(model_name, task, params):
             return XGBRegressor(**params)
         elif model_name == "catboost":
             return CatBoostRegressor(**params)
+        elif model_name == "randomforest":
+            return RandomForestRegressor(**params)
         else:
             raise ValueError(f"Unknown model: {model_name}")
 
@@ -349,6 +384,11 @@ def objective(trial, X, y, model_name, task):
     # Prepare cross-validation
     if task == 'classification':
         cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+        # Convert y to integers for SMOTETomek
+        y_int = y.astype(int)
+        # Count samples in each class
+        counts = np.bincount(y_int)
+        min_samples = min(counts)
     else:
         cv = KFold(n_splits=5, shuffle=True, random_state=42)
     
@@ -365,10 +405,20 @@ def objective(trial, X, y, model_name, task):
         
         # Train model
         if task == 'classification':
-            model.fit(
-                X_train_fold, y_train_fold,
-                eval_set=[(X_val_fold, y_val_fold)]
-            )
+            # Apply SMOTETomek for class imbalance if we have enough samples
+            if min_samples >= 3:
+                # Use SMOTETomek (SMOTE + Tomek links)
+                smote_tomek = SMOTETomek(smote=SMOTE(k_neighbors=min(5, min_samples-1), random_state=42), random_state=42)
+                X_train_resampled, y_train_resampled = smote_tomek.fit_resample(X_train_fold, y_train_fold)
+                model.fit(
+                    X_train_resampled, y_train_resampled,
+                    eval_set=[(X_val_fold, y_val_fold)]
+                )
+            else:
+                model.fit(
+                    X_train_fold, y_train_fold,
+                    eval_set=[(X_val_fold, y_val_fold)]
+                )
             # For classification, maximize ROC AUC
             y_val_pred_proba = model.predict_proba(X_val_fold)[:, 1]
             fold_score = roc_auc_score(y_val_fold, y_val_pred_proba)
@@ -465,18 +515,38 @@ def optimize_model(score_type, n_trials, model_name, task='classification', sele
             final_model = LGBMClassifier(**best_params)
         elif model_name == 'xgboost':
             final_model = XGBClassifier(**best_params)
-        else:  # catboost
+        elif model_name == 'catboost':
             final_model = CatBoostClassifier(**best_params)
+        elif model_name == 'randomforest':
+            final_model = RandomForestClassifier(**best_params)
     else:
         if model_name == 'lightgbm':
             final_model = LGBMRegressor(**best_params)
         elif model_name == 'xgboost':
             final_model = XGBRegressor(**best_params)
-        else:  # catboost
+        elif model_name == 'catboost':
             final_model = CatBoostRegressor(**best_params)
+        elif model_name == 'randomforest':
+            final_model = RandomForestRegressor(**best_params)
     
     # Fit final model
-    final_model.fit(X_train, y_train)
+    if task == 'classification':
+        # Check if we have enough samples in each class for SMOTETomek
+        y_train_int = y_train.astype(int)
+        counts = np.bincount(y_train_int)
+        min_samples = min(counts)
+        
+        if min_samples >= 3:
+            # Apply SMOTETomek for class imbalance
+            print("Applying SMOTETomek to balance training data...")
+            smote_tomek = SMOTETomek(smote=SMOTE(k_neighbors=min(5, min_samples-1), random_state=42), random_state=42)
+            X_train_resampled, y_train_resampled = smote_tomek.fit_resample(X_train, y_train)
+            final_model.fit(X_train_resampled, y_train_resampled)
+        else:
+            print("Not enough samples for SMOTETomek, training with original data...")
+            final_model.fit(X_train, y_train)
+    else:
+        final_model.fit(X_train, y_train)
     
     # Save model
     model_output = (config.MODEL_OUTPUT_classification if task == 'classification' 
@@ -526,7 +596,7 @@ if __name__ == "__main__":
                       choices=['FRIED', 'FRAGIRE18', 'CHUTE_6M', 'CHUTE_12M'],
                       help='Score type to use for model training')
     parser.add_argument('--model_name', type=str, default='lightgbm',
-                      choices=['lightgbm', 'xgboost', 'catboost'],
+                      choices=['lightgbm', 'xgboost', 'catboost', 'randomforest'],
                       help='Model to use')
     parser.add_argument('--task', type=str, default='classification',
                       choices=['classification', 'regression'],

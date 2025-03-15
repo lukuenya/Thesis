@@ -44,7 +44,7 @@ def drop_correlated_features(
     return df.drop(columns=to_drop)
 
 
-def cvbknn_imputer(X, n_splits=5, k_values=[3, 5, 7], verbose=False):
+def cvbknn_imputer(X, n_splits=5, k_values=[3, 5, 7,10], verbose=False):
     """
     Cross-validated KNN imputation to find optimal k
     """
@@ -157,7 +157,7 @@ def identify_variable_types(df):
     return binary_cols, ordinal_cols, continuous_cols
 
 
-def process_imputation(X, n_splits=5, k_values=[3, 5, 7], verbose=False):
+def process_imputation(X, n_splits=5, k_values=[3, 5, 7, 10], verbose=False):
     """
     Clinical data-aware imputation process
     
