@@ -45,15 +45,18 @@ def plot_roc_curves(y_true, y_pred_proba, score_type, model_name, selected_featu
     plt.legend(loc="lower right")
     
     suffix = '_selected' if selected_features else ''
+    output_dir = os.path.join(config.VISUALIZATION_OUTPUT, model_name, score_type.upper())
+    os.makedirs(output_dir, exist_ok=True)
+    
     plt.savefig(os.path.join(
-        config.VISUALIZATION_OUTPUT,
-        f"roc_curve_{model_name}_{score_type.lower()}{suffix}.png"
+        output_dir,
+        f"roc_curve{suffix}.png"
     ))
     plt.close()
 
 
 def plot_precision_recall_curve(y_true, y_pred_proba, score_type, model_name, selected_features=False):
-    """Plot precision-recall curve."""
+    """Plot precision-recall curve for classification."""
     precision, recall, _ = precision_recall_curve(y_true, y_pred_proba)
     ap_score = average_precision_score(y_true, y_pred_proba)
     
@@ -64,13 +67,15 @@ def plot_precision_recall_curve(y_true, y_pred_proba, score_type, model_name, se
     plt.ylim([0.0, 1.05])
     plt.xlabel('Recall')
     plt.ylabel('Precision')
-    plt.legend(loc="lower left")
-    plt.tight_layout()
+    plt.legend(loc="upper right")
     
     suffix = '_selected' if selected_features else ''
+    output_dir = os.path.join(config.VISUALIZATION_OUTPUT, model_name, score_type.upper())
+    os.makedirs(output_dir, exist_ok=True)
+    
     plt.savefig(os.path.join(
-        config.VISUALIZATION_OUTPUT,
-        f"pr_curve_{model_name}_{score_type.lower()}{suffix}.png"
+        output_dir,
+        f"pr_curve{suffix}.png"
     ))
     plt.close()
 
@@ -82,12 +87,14 @@ def plot_confusion_matrix_custom(y_true, y_pred, score_type, model_name, selecte
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', cbar=False)
     plt.xlabel('Predicted')
     plt.ylabel('True')
-    plt.tight_layout()
     
     suffix = '_selected' if selected_features else ''
+    output_dir = os.path.join(config.VISUALIZATION_OUTPUT, model_name, score_type.upper())
+    os.makedirs(output_dir, exist_ok=True)
+    
     plt.savefig(os.path.join(
-        config.VISUALIZATION_OUTPUT,
-        f"cm_{model_name}_{score_type.lower()}{suffix}.png"
+        output_dir,
+        f"cm{suffix}.png"
     ))
     plt.close()
 
@@ -129,10 +136,12 @@ def plot_feature_importance(model, feature_names, score_type, model_name, task, 
     plt.tight_layout()
     
     suffix = '_selected' if selected_features else ''
-    output_dir = config.VISUALIZATION_OUTPUT
+    output_dir = os.path.join(config.VISUALIZATION_OUTPUT, model_name, score_type.upper())
+    os.makedirs(output_dir, exist_ok=True)
+    
     plt.savefig(os.path.join(
         output_dir,
-        f"feature_importance_{model_name}_{score_type.lower()}_{task}{suffix}.png"
+        f"feature_importance_{task}{suffix}.png"
     ), dpi=300, bbox_inches='tight')
     plt.close()
     
@@ -263,15 +272,12 @@ def get_hyperparameter_space(trial, model_name):
         }
     elif model_name == 'catboost':
         params = {
-            'iterations': trial.suggest_int('iterations', 50, 500),
-            'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3),
-            'depth': trial.suggest_int('depth', 4, 10),
+            'iterations': trial.suggest_int('iterations', 50, 300),
+            'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.1),
+            'depth': trial.suggest_int('depth', 3, 10),
             'l2_leaf_reg': trial.suggest_float('l2_leaf_reg', 1, 10),
-            'border_count': trial.suggest_int('border_count', 32, 255),
             'bagging_temperature': trial.suggest_float('bagging_temperature', 0, 1),
-            'random_strength': trial.suggest_float('random_strength', 1e-8, 10, log=True),
-            'scale_pos_weight': trial.suggest_float('scale_pos_weight', 0.1, 10),
-            'random_seed': 42,
+            'auto_class_weights': 'Balanced',
             'verbose': False
         }
     else:
@@ -400,6 +406,10 @@ def optimize_model(score_type, n_trials=25, model_name='lightgbm', selected_feat
     # Create output directories if they don't exist
     os.makedirs(config.MODEL_OUTPUT, exist_ok=True)
     os.makedirs(config.VISUALIZATION_OUTPUT, exist_ok=True)
+    
+    # Create model and score specific visualization directory
+    model_score_vis_dir = os.path.join(config.VISUALIZATION_OUTPUT, model_name, score_type.upper())
+    os.makedirs(model_score_vis_dir, exist_ok=True)
     
     # Run hyperparameter optimization with cross-validation
     study = optuna.create_study(direction='maximize')
