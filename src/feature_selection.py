@@ -4,25 +4,40 @@ import joblib
 import os
 import data_loader
 import config
+import preprocessing
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
-from sklearn.feature_selection import SelectFromModel
+from sklearn.feature_selection import SelectFromModel, RFE
 from lightgbm import LGBMClassifier
 from xgboost import XGBClassifier
 from catboost import CatBoostClassifier
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import StratifiedKFold
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-def load_feature_importances(score_type):
+def load_feature_importances(score_type, imputation=True, feature_selection=None):
     """
     Load feature importance files for all models
+    
+    Parameters:
+    -----------
+    score_type : str
+        Score type (e.g., 'FRIED', 'FRAGIRE18')
+    imputation : bool
+        Whether imputation is used
+    feature_selection : str or None
+        Feature selection method used before (to maintain path consistency)
     """
     importances = {}
     models = ['lightgbm', 'xgboost', 'catboost', 'randomforest']
     
+    # Get output directory based on processing steps
+    paths = config.get_output_paths(imputation, feature_selection)
+    output_dir = paths['feature_importances']
+    
     for model in models:
         filepath = os.path.join(
-            config.FEATURE_IMPORTANCE_DIR,
+            output_dir,
             f"{model}_{score_type.lower()}_feature_importances.xlsx"
         )
         if os.path.exists(filepath):
@@ -30,6 +45,7 @@ def load_feature_importances(score_type):
             importances[model] = df
     
     return importances
+
 
 def aggregate_feature_importance(importances):
     """
@@ -74,6 +90,7 @@ def aggregate_feature_importance(importances):
     
     return mean_importance.sort_values('Mean_Importance', ascending=False)
 
+
 def select_top_features(agg_importance, threshold_percentile=20):
     """
     Select top features based on importance scores
@@ -83,11 +100,31 @@ def select_top_features(agg_importance, threshold_percentile=20):
     selected_features = agg_importance[agg_importance['Mean_Importance'] >= threshold]['Feature'].tolist()
     return selected_features
 
-def save_selected_features(selected_features, score_type):
-    """Save selected features to a file"""
+
+def save_selected_features(selected_features, score_type, imputation=True, feature_selection=None, prefix=''):
+    """
+    Save selected features to a file
+    
+    Parameters:
+    -----------
+    selected_features : list
+        List of selected feature names
+    score_type : str
+        Score type (e.g., 'FRIED', 'FRAGIRE18')
+    imputation : bool
+        Whether imputation is used
+    feature_selection : str or None
+        Feature selection method used before (to maintain path consistency)  
+    prefix : str
+        Prefix for the filename (default: '')
+    """
+    # Get output directory based on processing steps
+    paths = config.get_output_paths(imputation, feature_selection)
+    output_dir = paths['feature_importances']
+    
     filepath = os.path.join(
-        config.FEATURE_IMPORTANCE_DIR,
-        f"selected_features_{score_type.lower()}_classification.txt"
+        output_dir,
+        f"{prefix}selected_features_{score_type.lower()}_classification.txt"
     )
     
     # Create directory if it doesn't exist
@@ -99,16 +136,143 @@ def save_selected_features(selected_features, score_type):
     
     print(f"Selected features saved to: {filepath}")
 
-def main(score_type, threshold_percentile=20):
+
+def wrapper_feature_selection(X, y, n_features=10, random_state=42):
     """
-    Main function to perform feature selection
+    Wrapper method for feature selection using LightGBM for classification
+    
+    Parameters:
+    -----------
+    X : pd.DataFrame
+        Feature matrix
+    y : pd.Series
+        Target variable
+    n_features : int
+        Number of features to select
+    random_state : int
+        Random seed for reproducibility
+        
+    Returns:
+    --------
+    selected_features : list
+        List of selected feature names
+    feature_importances : pd.DataFrame
+        DataFrame with feature importances
+    """
+    print(f"Starting wrapper-based feature selection with LightGBM to select {n_features} features...")
+    
+    # Initialize model for classification
+    model = LGBMClassifier(
+        n_estimators=100,
+        random_state=random_state,
+        n_jobs=-1,
+        verbose=-1
+    )
+    
+    # Initialize RFE with the model
+    rfe = RFE(
+        estimator=model,
+        n_features_to_select=n_features,
+        step=0.1  # Remove 10% of features at each iteration
+    )
+    
+    # Fit RFE
+    rfe.fit(X, y)
+    
+    # Get selected feature names
+    feature_names = X.columns
+    selected_features = feature_names[rfe.support_].tolist()
+    
+    # Get feature rankings
+    feature_importances = pd.DataFrame({
+        'Feature': feature_names,
+        'Ranking': rfe.ranking_,
+        'Selected': rfe.support_
+    })
+    
+    # Sort by ranking
+    feature_importances = feature_importances.sort_values('Ranking')
+    
+    print(f"Selected {len(selected_features)} features using wrapper method with LightGBM")
+    print(f"Top 5 features: {selected_features[:5]}")
+    
+    return selected_features, feature_importances
+
+
+def run_wrapper_selection(X, y, score_type, imputation=True, n_features=10):
+    """
+    Run wrapper-based feature selection and save results
+    
+    Parameters:
+    -----------
+    X : pd.DataFrame
+        Feature matrix
+    y : pd.Series
+        Target variable
+    score_type : str
+        Score type (e.g., 'FRIED', 'FRAGIRE18')
+    imputation : bool
+        Whether imputation is used
+    n_features : int
+        Number of features to select
+        
+    Returns:
+    --------
+    selected_features : list
+        List of selected feature names
+    """
+    # Get output directory based on processing steps
+    paths = config.get_output_paths(imputation, 'wrapper')
+    output_dir = paths['feature_importances']
+    
+    # Run wrapper feature selection
+    selected_features, feature_importances = wrapper_feature_selection(
+        X, y, n_features=n_features
+    )
+    
+    # Save feature importances to Excel
+    os.makedirs(output_dir, exist_ok=True)
+    feature_importances.to_excel(
+        os.path.join(output_dir, f"wrapper_feature_importances_{score_type.lower()}.xlsx"),
+        index=False
+    )
+    
+    # Save selected features
+    save_selected_features(
+        selected_features, 
+        score_type,
+        imputation=imputation,
+        feature_selection='wrapper',
+        prefix="wrapper_"
+    )
+    
+    return selected_features
+
+
+def main(score_type, threshold_percentile=20, imputation=True):
+    """
+    Main function to perform embedded feature selection
+    
+    Parameters:
+    -----------
+    score_type : str
+        Score type (e.g., 'FRIED', 'FRAGIRE18')
+    threshold_percentile : int
+        Percentile threshold for feature selection (1-100)
+    imputation : bool
+        Whether imputation is used
+        
+    Returns:
+    --------
+    selected_features : list
+        List of selected feature names
     """
     # Load feature importances for all models
-    importances = load_feature_importances(score_type)
+    importances = load_feature_importances(score_type, imputation)
     
     if not importances:
         print(f"No feature importance files found for {score_type}")
-        return
+        return []
     
     # Aggregate importance scores across models
     agg_importance = aggregate_feature_importance(importances)
@@ -117,7 +281,16 @@ def main(score_type, threshold_percentile=20):
     selected_features = select_top_features(agg_importance, threshold_percentile)
     
     # Save selected features
-    save_selected_features(selected_features, score_type)
+    save_selected_features(
+        selected_features, 
+        score_type, 
+        imputation=imputation,
+        feature_selection='embedded'
+    )
+    
+    # Get output directory for plots
+    paths = config.get_output_paths(imputation, 'embedded')
+    output_dir = paths['feature_importances']
     
     # Plot feature importances
     plt.figure(figsize=(6, 8), dpi=300)  # High resolution
@@ -147,20 +320,48 @@ def main(score_type, threshold_percentile=20):
     plt.tight_layout()
     
     # Save plot
-    output_dir = config.FEATURE_IMPORTANCE_DIR
     os.makedirs(output_dir, exist_ok=True)
     plt.savefig(os.path.join(output_dir, f"feature_importance_{score_type.lower()}.png"))
     plt.close()
     
     return selected_features
 
+
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(description='Feature selection based on model importances')
+    parser = argparse.ArgumentParser(description='Feature selection for classification')
     parser.add_argument('--score_type', type=str, default='FRIED',
-                        help='Score to predict: FRIED, FRAGIRE18, CHUTE_6M, or CHUTE_12M')
+                        help='Score to predict: FRIED or FRAGIRE18')
     parser.add_argument('--threshold', type=int, default=20,
-                        help='Percentile threshold for feature selection (1-100)')
+                        help='Percentile threshold for embedded method (1-100)')
+    parser.add_argument('--method', type=str, default='embedded',
+                        help='Feature selection method: embedded or wrapper')
+    parser.add_argument('--n_features', type=int, default=10,
+                        help='Number of features to select for wrapper method')
+    parser.add_argument('--no_imputation', action='store_true',
+                        help='Use raw data without imputation')
     
     args = parser.parse_args()
-    main(args.score_type, args.threshold)
+    
+    # Determine if imputation is used
+    imputation = not args.no_imputation
+    
+    if args.method == 'embedded':
+        selected_features = main(args.score_type, args.threshold, imputation)
+        print(f"Selected {len(selected_features)} features with embedded method")
+        print(f"Imputation: {'Yes' if imputation else 'No'}")
+    elif args.method == 'wrapper':
+        # Load data with or without imputation
+        X, y = data_loader.load_data(target_score=args.score_type, imputation=imputation)
+        
+        # Run wrapper-based feature selection
+        selected_features = run_wrapper_selection(
+            X, y,
+            score_type=args.score_type,
+            imputation=imputation,
+            n_features=args.n_features
+        )
+        print(f"Selected {len(selected_features)} features with wrapper method")
+        print(f"Imputation: {'Yes' if imputation else 'No'}")
+    else:
+        print(f"Unknown method: {args.method}. Choose 'embedded' or 'wrapper'.")

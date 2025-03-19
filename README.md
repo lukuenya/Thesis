@@ -108,24 +108,42 @@ For easiness purposes, we will use binary classification problem to predict the 
 # REPRODUCIBILITY
 All experiments can be reproduced using the provided code:
 1. Configure parameters in `config.py`
-2. Run :
-      - `cd src`
-      - `python get_feature_importances.py --score_type FRIED --model_name ... --task ...`
+2. Run feature importance analysis:
+   ```bash
+   cd src
+   python get_feature_importances.py --score_type FRIED --model_name [model] --task [task]
+   python get_feature_importances.py --score_type FRAGIRE18 --model_name [model] --task [task]
+   ```
+   - Replace `[model]` with: `lightgbm`, `xgboost`, `randomforest` or `catboost`
 
-      - `python get_feature_importances.py --score_type FRAGIRE18 --model_name ...`
+3. Run feature selection with desired method:
+   ```bash
+   # Using embedded method (threshold-based)
+   python feature_selection.py --score_type FRIED --method embedded --threshold_percentile 20
+   
+   # Using wrapper method with specific number of features
+   python feature_selection.py --score_type FRIED --method wrapper --n_features 10
+   
+   # Without imputation (using raw data)
+   python feature_selection.py --score_type FRIED --method wrapper --n_features 10 --no_imputation
+   ```
 
-   for dimensionality reduction based on each model feature importances.
-      - Replace the ... in --model_name by 'lightgbm', 'xgboost', or 'catboost'
-      - Replace the ... in --task by 'classification' or 'regression'
+4. Train and optimize models:
+   ```bash
+   # Using embedded feature selection
+   python train_optimize.py --score_type FRIED --model [model] --feature_selection embedded
+   
+   # Using wrapper feature selection
+   python train_optimize.py --score_type FRIED --model [model] --feature_selection wrapper
+   
+   # Using all features (no feature selection)
+   python train_optimize.py --score_type FRIED --model [model] --no_feature_selection
+   
+   # Without imputation
+   python train_optimize.py --score_type FRIED --model [model] --no_imputation
+   ```
 
-3. Run :
-      - `python feature_selection.py --score_type FRIED --threshold_percentile 20 --task ...`
-      - `python feature_selection.py --score_type FRAGIRE18 --threshold_percentile 20 --task ...`
-   to aggregate feature importances and select top features for each score type.
-
-4. Train final models with selected features:
-      - `python train_optimize.py --score_type FRIED --model_name ... --selected_features --task ...`
-      - `python train_optimize.py --score_type FRAGIRE18 --model_name ... --selected_features --task ...`
+The output files will be organized in folders based on the processing steps (imputation and feature selection method).
 
 # DEPENDENCIES
 Required Python packages are listed in `requirements.txt`

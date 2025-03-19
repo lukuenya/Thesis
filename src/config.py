@@ -1,11 +1,60 @@
 # config.py
 
+import os
+
+# Input files
 TRAINING_FILE = "../input/data_global.xlsx"
 
-MODEL_OUTPUT = "../models/classifiers/"
-FEATURE_IMPORTANCE_DIR = "../models/feature_importances/"
-VISUALIZATION_OUTPUT = "../visualization/classification/"
+# Base output directories
+BASE_OUTPUT_DIR = "../output"
+MODEL_BASE_DIR = os.path.join(BASE_OUTPUT_DIR, "models")
+VISUALIZATION_BASE_DIR = os.path.join(BASE_OUTPUT_DIR, "visualization")
 
+# Create a function to generate paths with processing steps
+def get_output_paths(imputation=True, feature_selection=None):
+    """
+    Generate output paths based on processing steps
+    
+    Parameters:
+    -----------
+    imputation : bool
+        Whether imputation is used
+    feature_selection : str or None
+        Feature selection method: 'wrapper', 'embedded', or None
+        
+    Returns:
+    --------
+    dict
+        Dictionary with output paths
+    """
+    # Create processing steps string
+    steps = []
+    if imputation:
+        steps.append("imputed")
+    else:
+        steps.append("raw")
+        
+    if feature_selection:
+        steps.append(f"{feature_selection}_fs")
+    
+    # Join steps with underscore
+    step_str = "_".join(steps)
+    
+    # Create paths
+    paths = {
+        "models": os.path.join(MODEL_BASE_DIR, step_str, "classifiers"),
+        "feature_importances": os.path.join(MODEL_BASE_DIR, step_str, "feature_importances"),
+        "visualization": os.path.join(VISUALIZATION_BASE_DIR, step_str, "classification")
+    }
+    
+    return paths
+
+# Default paths for backward compatibility
+MODEL_OUTPUT = os.path.join(MODEL_BASE_DIR, "imputed", "classifiers")
+FEATURE_IMPORTANCE_DIR = os.path.join(MODEL_BASE_DIR, "imputed", "feature_importances")
+VISUALIZATION_OUTPUT = os.path.join(VISUALIZATION_BASE_DIR, "imputed", "classification")
+
+# Columns to drop
 COLS_TO_DROP_FRAGIRE18_FRIED = [
     "Foldername",
     "Frailty_State_GFST",

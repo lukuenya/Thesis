@@ -6,17 +6,25 @@ import config
 import preprocessing
 import os
 
-def load_data(target_score='FRIED', selected_features=False):
+def load_data(target_score='FRIED', selected_features=False, imputation=True, feature_selection_method=None, n_features=10, threshold_percentile=20):
     """
-    Load the dataset and prepare X, y for model training
+    Prepare the dataset for training by loading data, preprocessing features, and selecting the target.
     
     Parameters:
     -----------
-    target_score : str, optional (default='FRIED')
-        Which score to predict: 'FRIED' or 'FRAGIRE18'
-    selected_features : bool, optional (default=False)
-        Whether to use only selected important features
-    
+    target_score : str
+        The target score to predict ('FRIED' or 'FRAGIRE18')
+    selected_features : bool
+        Whether to use pre-selected features
+    imputation : bool
+        Whether to use imputation or raw data
+    feature_selection_method : str or None
+        Feature selection method to use ('embedded', 'wrapper', or None)
+    n_features : int
+        Number of features to select for wrapper method
+    threshold_percentile : int
+        Percentile threshold for embedded feature selection
+        
     Returns:
     --------
     X : pd.DataFrame
@@ -24,44 +32,77 @@ def load_data(target_score='FRIED', selected_features=False):
     y : pd.Series
         Target variable
     """
+    print(f"Loading data for {target_score} with imputation={imputation}")
+    
+    # Load dataset
     df = pd.read_excel(config.TRAINING_FILE)
     
-    # Prepare X and y based on target score
-    if target_score.upper() == 'FRIED':
-        X = df.drop(config.COLS_TO_DROP_FRAGIRE18_FRIED + ['Fried_State'], axis=1)
-        y = df.Fried_State
-    elif target_score.upper() == 'FRAGIRE18':
-        X = df.drop(config.COLS_TO_DROP_FRAGIRE18_FRIED + ['Frailty_State_GFST'], axis=1)
-        y = df.Frailty_State_GFST
+    # Get target for classification
+    target_name = config.TARGET_COLUMNS_DICT[target_score]['classification']
+    
+    # Preprocess features
+    if imputation:
+        X = preprocessing.process_features(df)
     else:
-        raise ValueError(f"Unknown target score: {target_score}")
+        print("Using raw data without imputation")
+        # Preprocess without imputation
+        X = preprocessing.process_features(df, impute=False)
     
-    # Drop NaN rows in y and corresponding rows in X
-    X = X[y.notna()]
-    y = y.dropna()
+    # Get target
+    y = df[target_name]
     
-    # # Drop folow-up columns
-    # follow_up_cols = [col for col in X.columns if col.endswith('follow-up')]
-    # X = X.drop(follow_up_cols, axis=1)
-    
-    # Drop columns with more than 60% missing values
-    X = preprocessing.drop_high_missing(X, threshold=0.6)
-
-    # Drop columns with near-zero variance
-    X = preprocessing.drop_near_zero_variance(X)
-
-    # Impute missing values
-    X_imputed, _ = preprocessing.process_imputation(X.values)
-    X = pd.DataFrame(X_imputed, columns=X.columns, index=X.index)
-
-    # # Process features - drop highly correlated and non-useful features
-    # X, _ = preprocessing.process_features(X)
-    
-    # Apply feature selection if requested
+    # Feature selection
     if selected_features:
-        feature_list = load_selected_features(target_score)
-        if feature_list:
-            X = X[feature_list]
+        # Get output paths based on imputation and feature selection state
+        paths = config.get_output_paths(
+            imputation=imputation, 
+            feature_selection=feature_selection_method if feature_selection_method else "embedded"
+        )
+        output_dir = paths['feature_importances']
+        
+        # Construct prefix for filename
+        prefix = ""
+        if feature_selection_method == "wrapper":
+            prefix = "wrapper_"
+            
+        # Load selected features from file
+        filepath = os.path.join(
+            output_dir,
+            f"{prefix}selected_features_{target_score.lower()}_classification.txt"
+        )
+        
+        if os.path.exists(filepath):
+            with open(filepath, 'r') as f:
+                selected_feature_names = [line.strip() for line in f]
+            print(f"Loaded {len(selected_feature_names)} pre-selected features from {filepath}")
+            X = X[selected_feature_names]
+        else:
+            print(f"Warning: No pre-selected features found at {filepath}")
+    
+    # Apply feature selection on-the-fly
+    elif feature_selection_method == 'embedded':
+        # Load feature importances for all models
+        importances = feature_selection.load_feature_importances(target_score, imputation)
+        
+        if not importances:
+            print("Warning: No feature importance files found. Using all features.")
+        else:
+            # Aggregate importance scores across models
+            agg_importance = feature_selection.aggregate_feature_importance(importances)
+            
+            # Select top features
+            selected_feature_names = feature_selection.select_top_features(agg_importance, threshold_percentile)
+            print(f"Selected {len(selected_feature_names)} features using embedded method")
+            
+            # Filter features
+            X = X[selected_feature_names]
+            
+    elif feature_selection_method == 'wrapper':
+        # Perform wrapper-based feature selection
+        selected_feature_names, _ = feature_selection.wrapper_feature_selection(
+            X, y, n_features=n_features
+        )
+        X = X[selected_feature_names]
     
     return X, y
 

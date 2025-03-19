@@ -30,7 +30,7 @@ import data_loader
 # PLOTTING FUNCTIONS (same style as you had)
 # -----------------------------------------------------------------------------
 
-def plot_roc_curves(y_true, y_pred_proba, score_type, model_name, selected_features=False):
+def plot_roc_curves(y_true, y_pred_proba, score_type, model_name, imputation=True, feature_selection=None):
     """Plot ROC curve for classification."""
     fpr, tpr, _ = roc_curve(y_true, y_pred_proba)
     roc_auc = roc_auc_score(y_true, y_pred_proba)
@@ -44,18 +44,19 @@ def plot_roc_curves(y_true, y_pred_proba, score_type, model_name, selected_featu
     plt.ylabel('True Positive Rate')
     plt.legend(loc="lower right")
     
-    suffix = '_selected' if selected_features else ''
-    output_dir = os.path.join(config.VISUALIZATION_OUTPUT, model_name, score_type.upper())
+    # Get dynamic output path
+    paths = config.get_output_paths(imputation, feature_selection)
+    output_dir = os.path.join(paths['visualization'], model_name, score_type.upper())
     os.makedirs(output_dir, exist_ok=True)
     
     plt.savefig(os.path.join(
         output_dir,
-        f"roc_curve{suffix}.png"
+        "roc_curve.png"
     ))
     plt.close()
 
 
-def plot_precision_recall_curve(y_true, y_pred_proba, score_type, model_name, selected_features=False):
+def plot_precision_recall_curve(y_true, y_pred_proba, score_type, model_name, imputation=True, feature_selection=None):
     """Plot precision-recall curve for classification."""
     precision, recall, _ = precision_recall_curve(y_true, y_pred_proba)
     ap_score = average_precision_score(y_true, y_pred_proba)
@@ -69,18 +70,19 @@ def plot_precision_recall_curve(y_true, y_pred_proba, score_type, model_name, se
     plt.ylabel('Precision')
     plt.legend(loc="upper right")
     
-    suffix = '_selected' if selected_features else ''
-    output_dir = os.path.join(config.VISUALIZATION_OUTPUT, model_name, score_type.upper())
+    # Get dynamic output path
+    paths = config.get_output_paths(imputation, feature_selection)
+    output_dir = os.path.join(paths['visualization'], model_name, score_type.upper())
     os.makedirs(output_dir, exist_ok=True)
     
     plt.savefig(os.path.join(
         output_dir,
-        f"pr_curve{suffix}.png"
+        "pr_curve.png"
     ))
     plt.close()
 
 
-def plot_confusion_matrix_custom(y_true, y_pred, score_type, model_name, selected_features=False):
+def plot_confusion_matrix_custom(y_true, y_pred, score_type, model_name, imputation=True, feature_selection=None):
     """Plot confusion matrix."""
     cm = confusion_matrix(y_true, y_pred)
     plt.figure(figsize=(8, 6), dpi=300)
@@ -88,18 +90,19 @@ def plot_confusion_matrix_custom(y_true, y_pred, score_type, model_name, selecte
     plt.xlabel('Predicted')
     plt.ylabel('True')
     
-    suffix = '_selected' if selected_features else ''
-    output_dir = os.path.join(config.VISUALIZATION_OUTPUT, model_name, score_type.upper())
+    # Get dynamic output path
+    paths = config.get_output_paths(imputation, feature_selection)
+    output_dir = os.path.join(paths['visualization'], model_name, score_type.upper())
     os.makedirs(output_dir, exist_ok=True)
     
     plt.savefig(os.path.join(
         output_dir,
-        f"cm{suffix}.png"
+        "cm.png"
     ))
     plt.close()
 
 
-def plot_feature_importance(model, feature_names, score_type, model_name, task, selected_features=False):
+def plot_feature_importance(model, feature_names, score_type, model_name, task, imputation=True, feature_selection=None):
     """
     Plot feature importance for the trained model.
     
@@ -109,7 +112,8 @@ def plot_feature_importance(model, feature_names, score_type, model_name, task, 
         score_type: Score type ('FRIED', 'FRAGIRE18')
         model_name: Model name (e.g., 'lightgbm')
         task: Task type ('classification')
-        selected_features: Whether selected features were used
+        imputation: Whether imputation was used
+        feature_selection: Feature selection method used
     """
     # Get feature importances based on model type
     if hasattr(model, 'feature_importances_'):
@@ -135,24 +139,25 @@ def plot_feature_importance(model, feature_names, score_type, model_name, task, 
     plt.title('')
     plt.tight_layout()
     
-    suffix = '_selected' if selected_features else ''
-    output_dir = os.path.join(config.VISUALIZATION_OUTPUT, model_name, score_type.upper())
+    # Get dynamic output paths
+    paths = config.get_output_paths(imputation, feature_selection)
+    output_dir = os.path.join(paths['visualization'], model_name, score_type.upper())
     os.makedirs(output_dir, exist_ok=True)
     
     plt.savefig(os.path.join(
         output_dir,
-        f"feature_importance_{task}{suffix}.png"
+        f"feature_importance_{task}.png"
     ), dpi=300, bbox_inches='tight')
     plt.close()
     
     # Also save the feature importance to Excel
-    feature_imp_dir = os.path.join(config.MODEL_OUTPUT, 'feature_importances', 'feat_imp_classification')
+    feature_imp_dir = os.path.join(paths['feature_importances'])
     os.makedirs(feature_imp_dir, exist_ok=True)
     
     importance_df.to_excel(
         os.path.join(
             feature_imp_dir,
-            f"{model_name}_{score_type.lower()}_feature_importances{suffix}.xlsx"
+            f"{model_name}_{score_type.lower()}_feature_importances.xlsx"
         ),
         index=False
     )
@@ -178,7 +183,7 @@ def find_optimal_threshold(y_true, y_pred_proba, metric='f1'):
     return best_threshold, best_score
 
 
-def evaluate_model(model, X_test, y_test, score_type, model_name, selected_features=False):
+def evaluate_model(model, X_test, y_test, score_type, model_name, imputation=True, feature_selection=None):
     """
     Evaluate a trained model and generate evaluation plots.
     
@@ -188,7 +193,8 @@ def evaluate_model(model, X_test, y_test, score_type, model_name, selected_featu
         y_test: Test targets
         score_type: Target score type (e.g., 'FRIED')
         model_name: Name of the model (e.g., 'lightgbm')
-        selected_features: Whether selected features were used
+        imputation: Whether imputation was used
+        feature_selection: Feature selection method used
     """
     # Make predictions
     y_pred_proba = model.predict_proba(X_test)[:, 1]
@@ -196,30 +202,45 @@ def evaluate_model(model, X_test, y_test, score_type, model_name, selected_featu
     y_pred = (y_pred_proba >= optimal_threshold).astype(int)
     
     # Generate and save plots
-    plot_roc_curves(y_test, y_pred_proba, score_type, model_name, selected_features)
-    plot_precision_recall_curve(y_test, y_pred_proba, score_type, model_name, selected_features)
-    plot_confusion_matrix_custom(y_test, y_pred, score_type, model_name, selected_features)
+    plot_roc_curves(y_test, y_pred_proba, score_type, model_name, imputation, feature_selection)
+    plot_precision_recall_curve(y_test, y_pred_proba, score_type, model_name, imputation, feature_selection)
+    plot_confusion_matrix_custom(y_test, y_pred, score_type, model_name, imputation, feature_selection)
     
-    # Print evaluation metrics
-    print("\nEvaluation Metrics:")
+    if hasattr(model, 'feature_importances_') or (model_name == 'lightgbm' and hasattr(model, 'feature_importance')):
+        plot_feature_importance(model, X_test.columns, score_type, model_name, 'classification', imputation, feature_selection)
+    
+    # Calculate and print metrics
+    print("\nModel Evaluation:")
+    print("================")
+    print(f"Optimal threshold: {optimal_threshold:.3f}")
+    
+    # Print classification report
+    print("\nClassification Report:")
     print(classification_report(y_test, y_pred))
     
-    # Calculate and print additional metrics
+    # Print confusion matrix
+    print("\nConfusion Matrix:")
+    cm = confusion_matrix(y_test, y_pred)
+    print(cm)
+    
+    # Print ROC AUC
     roc_auc = roc_auc_score(y_test, y_pred_proba)
-    precision = precision_score(y_test, y_pred)
-    recall = recall_score(y_test, y_pred)
+    print(f"\nROC AUC: {roc_auc:.3f}")
+    
+    # Print average precision score
+    ap_score = average_precision_score(y_test, y_pred_proba)
+    print(f"Average Precision: {ap_score:.3f}")
+    
+    # Print F1 score
     f1 = f1_score(y_test, y_pred)
+    print(f"F1 Score: {f1:.3f}")
     
-    print(f"ROC AUC: {roc_auc:.4f}")
-    print(f"Precision: {precision:.4f}")
-    print(f"Recall: {recall:.4f}")
-    print(f"F1 Score: {f1:.4f}")
-    print(f"Optimal Threshold: {optimal_threshold:.4f}")
-    
-    # Plot and save feature importance
-    if hasattr(model, 'feature_importances_') or hasattr(model, 'feature_importance'):
-        feature_names = X_test.columns.tolist()
-        plot_feature_importance(model, feature_names, score_type, model_name, 'classification', selected_features)
+    return {
+        'roc_auc': roc_auc,
+        'ap_score': ap_score,
+        'f1': f1,
+        'threshold': optimal_threshold
+    }
 
 
 # -----------------------------------------------------------------------------
@@ -228,314 +249,222 @@ def evaluate_model(model, X_test, y_test, score_type, model_name, selected_featu
 
 def get_hyperparameter_space(trial, model_name):
     """Define hyperparameter space for the given model name."""
-    if model_name == 'randomforest':
-        params = {
+    if model_name == 'lightgbm':
+        return {
             'n_estimators': trial.suggest_int('n_estimators', 50, 500),
-            'max_depth': trial.suggest_int('max_depth', 3, 25),
-            'min_samples_split': trial.suggest_int('min_samples_split', 2, 20),
-            'min_samples_leaf': trial.suggest_int('min_samples_leaf', 1, 20),
-            'bootstrap': trial.suggest_categorical('bootstrap', [True, False]),
-            'class_weight': trial.suggest_categorical('class_weight', ['balanced', None]),
-            'random_state': 42
-        }
-    elif model_name == 'lightgbm':
-        params = {
-            'objective': 'binary',
-            'metric': 'auc',
-            'boosting_type': trial.suggest_categorical('boosting_type', ['gbdt', 'dart', 'rf']),
-            'num_leaves': trial.suggest_int('num_leaves', 20, 50),
-            'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.1),
-            'n_estimators': trial.suggest_int('n_estimators', 50, 300),
-            'min_child_samples': trial.suggest_int('min_child_samples', 5, 30),
-            'subsample': trial.suggest_float('subsample', 0.5, 1.0),
-            'colsample_bytree': trial.suggest_float('colsample_bytree', 0.5, 1.0),
-            'reg_alpha': trial.suggest_float('reg_alpha', 1e-8, 10.0, log=True),
-            'reg_lambda': trial.suggest_float('reg_lambda', 1e-8, 10.0, log=True),
-            'random_state': 42,
-            'verbose': -1
+            'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3),
+            'num_leaves': trial.suggest_int('num_leaves', 20, 100),
+            'max_depth': trial.suggest_int('max_depth', 3, 10),
+            'min_data_in_leaf': trial.suggest_int('min_data_in_leaf', 10, 50),
+            'feature_fraction': trial.suggest_float('feature_fraction', 0.6, 1.0),
+            'bagging_fraction': trial.suggest_float('bagging_fraction', 0.6, 1.0),
+            'bagging_freq': trial.suggest_int('bagging_freq', 1, 10),
+            'min_child_weight': trial.suggest_float('min_child_weight', 1e-3, 10.0, log=True),
+            'reg_alpha': trial.suggest_float('reg_alpha', 1e-8, 1.0, log=True),
+            'reg_lambda': trial.suggest_float('reg_lambda', 1e-8, 1.0, log=True)
         }
     elif model_name == 'xgboost':
-        params = {
-            'objective': 'binary:logistic',
-            'eval_metric': 'auc',
-            'booster': trial.suggest_categorical('booster', ['gbtree', 'gblinear']),
-            'max_depth': trial.suggest_int('max_depth', 3, 7),
-            'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.1),
-            'n_estimators': trial.suggest_int('n_estimators', 50, 300),
-            'min_child_weight': trial.suggest_int('min_child_weight', 1, 20),
-            'subsample': trial.suggest_float('subsample', 0.5, 1.0),
-            'colsample_bytree': trial.suggest_float('colsample_bytree', 0.5, 1.0),
+        return {
+            'n_estimators': trial.suggest_int('n_estimators', 50, 500),
+            'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3),
+            'max_depth': trial.suggest_int('max_depth', 3, 10),
+            'min_child_weight': trial.suggest_float('min_child_weight', 1e-3, 10.0, log=True),
+            'subsample': trial.suggest_float('subsample', 0.6, 1.0),
+            'colsample_bytree': trial.suggest_float('colsample_bytree', 0.6, 1.0),
             'gamma': trial.suggest_float('gamma', 1e-8, 1.0, log=True),
-            'reg_alpha': trial.suggest_float('reg_alpha', 1e-8, 10.0, log=True),
-            'reg_lambda': trial.suggest_float('reg_lambda', 1e-8, 10.0, log=True),
-            'verbosity': 0
+            'reg_alpha': trial.suggest_float('reg_alpha', 1e-8, 1.0, log=True),
+            'reg_lambda': trial.suggest_float('reg_lambda', 1e-8, 1.0, log=True)
         }
     elif model_name == 'catboost':
-        params = {
-            'iterations': trial.suggest_int('iterations', 50, 300),
-            'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.1),
+        return {
+            'iterations': trial.suggest_int('iterations', 50, 500),
+            'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3),
             'depth': trial.suggest_int('depth', 3, 10),
-            'l2_leaf_reg': trial.suggest_float('l2_leaf_reg', 1, 10),
-            'bagging_temperature': trial.suggest_float('bagging_temperature', 0, 1),
-            'auto_class_weights': 'Balanced',
-            'verbose': False
+            'l2_leaf_reg': trial.suggest_float('l2_leaf_reg', 1e-8, 10.0, log=True),
+            'random_strength': trial.suggest_float('random_strength', 1e-8, 10.0, log=True),
+            'bagging_temperature': trial.suggest_float('bagging_temperature', 0, 10.0),
+            'border_count': trial.suggest_int('border_count', 10, 100)
+        }
+    elif model_name == 'randomforest':
+        return {
+            'n_estimators': trial.suggest_int('n_estimators', 50, 300),
+            'max_depth': trial.suggest_int('max_depth', 3, 15),
+            'min_samples_split': trial.suggest_int('min_samples_split', 2, 20),
+            'min_samples_leaf': trial.suggest_int('min_samples_leaf', 1, 10),
+            'max_features': trial.suggest_categorical('max_features', ['sqrt', 'log2', 0.7, 0.5])
         }
     else:
-        raise ValueError(f"Unsupported model name: {model_name}")
-    
-    return params
+        raise ValueError(f"Unknown model name: {model_name}")
 
 
 def initialize_model(model_name, params):
     """Initialize model based on the given model name and parameters."""
-    if model_name == 'randomforest':
-        return RandomForestClassifier(**params)
-    elif model_name == 'lightgbm':
-        return LGBMClassifier(**params)
+    if model_name == 'lightgbm':
+        return LGBMClassifier(**params, verbose=-1)
     elif model_name == 'xgboost':
-        return XGBClassifier(**params)
+        return XGBClassifier(**params, verbosity=0, use_label_encoder=False, eval_metric='logloss')
     elif model_name == 'catboost':
-        return CatBoostClassifier(**params)
+        return CatBoostClassifier(**params, verbose=0, thread_count=-1)
+    elif model_name == 'randomforest':
+        return RandomForestClassifier(**params, n_jobs=-1)
     else:
-        raise ValueError(f"Unsupported model name: {model_name}")
+        raise ValueError(f"Unknown model name: {model_name}")
 
 
 def objective(trial, X, y, model_name):
     """Optuna objective function for hyperparameter optimization using Pipeline."""
-    # Define hyperparameter space based on model
+    # Define hyperparameter space based on model name
     params = get_hyperparameter_space(trial, model_name)
     
-    # Initialize model with current hyperparameters
+    # Initialize model
     model = initialize_model(model_name, params)
     
-    # Count samples in each class to determine SMOTE parameters
-    if isinstance(y, pd.Series):
-        y_int = y.astype(int)
-    else:
-        y_int = y.astype(int)
+    # Define cross-validation strategy
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
     
-    counts = np.bincount(y_int)
-    min_samples = min(counts)
-    k_neighbors = min(5, min_samples-1) if min_samples >= 3 else 1
+    # Use SMOTETomek for class imbalance
+    resampler = SMOTETomek(random_state=42)
     
-    # Use 3-fold cross-validation (because of limited data in positive class)
-    cv = StratifiedKFold(n_splits=3, shuffle=True, random_state=42)
-    cv_scores = []
-    skipped_folds = 0
-    
-    # Pipeline with SMOTETomek for handling class imbalance
+    # Create pipeline with resampling
     pipeline = Pipeline([
-        ('sampling', SMOTETomek(
-            smote=SMOTE(k_neighbors=k_neighbors, random_state=42), 
-            random_state=42
-        ) if min_samples >= 3 else None),
+        ('smote_tomek', resampler),
         ('model', model)
     ])
     
-    # If we don't have enough samples for SMOTE, remove the sampling step
-    if min_samples < 3:
-        pipeline.steps.pop(0)
+    # For each fold in CV, fit model and compute score
+    scores = []
+    for train_idx, val_idx in cv.split(X, y):
+        X_train_fold, X_val_fold = X.iloc[train_idx], X.iloc[val_idx]
+        y_train_fold, y_val_fold = y.iloc[train_idx], y.iloc[val_idx]
+        
+        # Only apply resampling on training data to avoid data leakage
+        if model_name in ['lightgbm', 'xgboost', 'catboost']:
+            X_res, y_res = resampler.fit_resample(X_train_fold, y_train_fold)
+            model.fit(X_res, y_res)
+        else:
+            pipeline.fit(X_train_fold, y_train_fold)
+        
+        # Get predictions
+        if model_name in ['lightgbm', 'xgboost', 'catboost']:
+            y_pred_proba = model.predict_proba(X_val_fold)[:, 1]
+        else:
+            y_pred_proba = pipeline.predict_proba(X_val_fold)[:, 1]
+        
+        # Compute ROC AUC score
+        roc_auc = roc_auc_score(y_val_fold, y_pred_proba)
+        scores.append(roc_auc)
     
-    # Cross-validation
-    for i, (train_idx, val_idx) in enumerate(cv.split(X, y)):
-        try:
-            # Convert to DataFrame and Series if they're not already
-            if isinstance(X, pd.DataFrame):
-                X_train_fold, X_val_fold = X.iloc[train_idx], X.iloc[val_idx]
-            else:
-                X_train_fold, X_val_fold = X[train_idx], X[val_idx]
-                
-            if isinstance(y, pd.Series):
-                y_train_fold, y_val_fold = y.iloc[train_idx], y.iloc[val_idx]
-            else:
-                y_train_fold, y_val_fold = y[train_idx], y[val_idx]
-            
-            # Check if validation fold has only one class
-            if len(np.unique(y_val_fold)) == 1:
-                skipped_folds += 1
-                continue  # Skip this fold
-            
-            # Fit the pipeline on training data
-            if model_name == 'randomforest':
-                pipeline.fit(X_train_fold, y_train_fold)
-            else:
-                # For models that support eval_set
-                # Need to fit model directly after sampling
-                X_train_resampled, y_train_resampled = X_train_fold, y_train_fold
-                
-                # Apply sampling if it's in the pipeline
-                if min_samples >= 3:
-                    X_train_resampled, y_train_resampled = pipeline.named_steps['sampling'].fit_resample(
-                        X_train_fold, y_train_fold
-                    )
-                
-                model.fit(
-                    X_train_resampled, y_train_resampled,
-                    eval_set=[(X_val_fold, y_val_fold)]
-                )
-            
-            # Evaluate on validation fold
-            if model_name == 'randomforest':
-                y_val_pred_proba = pipeline.predict_proba(X_val_fold)[:, 1]
-            else:
-                y_val_pred_proba = model.predict_proba(X_val_fold)[:, 1]
-                
-            fold_score = roc_auc_score(y_val_fold, y_val_pred_proba)
-            cv_scores.append(fold_score)
-        except Exception as e:
-            print(f"Error in fold {i}: {str(e)}")
-            continue
-    
-    # Log if too many folds are being skipped
-    if skipped_folds > 0:
-        print(f"Warning: Skipped {skipped_folds}/{cv.n_splits} folds due to single-class validation sets")
-    
-    # Return mean score across folds
-    mean_score = np.mean(cv_scores) if cv_scores else 0.0
-    return mean_score
+    # Return mean ROC AUC score across folds
+    return np.mean(scores)
 
 
-def optimize_model(score_type, n_trials=25, model_name='lightgbm', selected_features=False):
-    """Optimize model hyperparameters and train final model."""
-    print(f"Loading data for {score_type}...")
+def optimize_model(score_type, n_trials=25, model_name='lightgbm', imputation=True, feature_selection=None):
+    """
+    Optimize model hyperparameters and train final model.
+    
+    Args:
+        score_type: Target score type (e.g., 'FRIED', 'FRAGIRE18')
+        n_trials: Number of trials for Optuna optimization
+        model_name: Model to use ('lightgbm', 'xgboost', 'catboost', 'randomforest')
+        imputation: Whether imputation was used
+        feature_selection: Feature selection method used ('embedded', 'wrapper', or None)
+    
+    Returns:
+        Dictionary with fitted model and evaluation results
+    """
+    print(f"Optimizing {model_name} for {score_type}")
+    print(f"Imputation: {'Yes' if imputation else 'No'}")
+    print(f"Feature Selection: {feature_selection if feature_selection else 'None'}")
+    
+    # Get data
     X, y = data_loader.load_data(
         target_score=score_type,
-        selected_features=selected_features
+        imputation=imputation,
+        feature_selection_method=feature_selection
     )
     
-    # Create output directories if they don't exist
-    os.makedirs(config.MODEL_OUTPUT, exist_ok=True)
-    os.makedirs(config.VISUALIZATION_OUTPUT, exist_ok=True)
+    # Train-test split
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)
     
-    # Create model and score specific visualization directory
-    model_score_vis_dir = os.path.join(config.VISUALIZATION_OUTPUT, model_name, score_type.upper())
-    os.makedirs(model_score_vis_dir, exist_ok=True)
+    # Run Optuna optimization
+    study = optuna.create_study(direction='maximize', study_name=f"{model_name}_{score_type}")
+    study.optimize(partial(objective, X=X_train, y=y_train, model_name=model_name), n_trials=n_trials)
     
-    # Run hyperparameter optimization with cross-validation
-    study = optuna.create_study(direction='maximize')
-    objective_func = lambda trial: objective(trial, X, y, model_name)
-    study.optimize(objective_func, n_trials=n_trials)
-    
-    # Get best parameters
+    # Get best hyperparameters
     best_params = study.best_params
-    print(f"Best parameters: {best_params}")
-    print(f"Best score: {study.best_value}")
+    print(f"\nBest hyperparameters: {best_params}")
     
-    # Calculate cross-validation scores with standard deviation
-    cv_scores = []
-    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
-    
-    # Initialize model with best parameters
+    # Initialize model with best hyperparameters
     best_model = initialize_model(model_name, best_params)
     
-    # Perform cross-validation to get mean and standard deviation
-    for train_idx, val_idx in cv.split(X, y):
-        # Handle DataFrame/Series indexing
-        if isinstance(X, pd.DataFrame):
-            X_train_fold, X_val_fold = X.iloc[train_idx], X.iloc[val_idx]
-        else:
-            X_train_fold, X_val_fold = X[train_idx], X[val_idx]
-            
-        if isinstance(y, pd.Series):
-            y_train_fold, y_val_fold = y.iloc[train_idx], y.iloc[val_idx]
-        else:
-            y_train_fold, y_val_fold = y[train_idx], y[val_idx]
-        
-        # Skip folds with only one class
-        if len(np.unique(y_val_fold)) == 1:
-            continue
-        
-        # Create and fit pipeline with best parameters
-        y_int = y_train_fold.astype(int)
-        counts = np.bincount(y_int)
-        min_samples = min(counts)
-        k_neighbors = min(5, min_samples-1) if min_samples >= 3 else 1
-        
-        if min_samples >= 3:
-            smote_tomek = SMOTETomek(smote=SMOTE(k_neighbors=k_neighbors, random_state=42), random_state=42)
-            X_train_resampled, y_train_resampled = smote_tomek.fit_resample(X_train_fold, y_train_fold)
-            best_model.fit(X_train_resampled, y_train_resampled)
-        else:
-            best_model.fit(X_train_fold, y_train_fold)
-        
-        # Calculate ROC AUC
-        y_val_pred_proba = best_model.predict_proba(X_val_fold)[:, 1]
-        fold_score = roc_auc_score(y_val_fold, y_val_pred_proba)
-        cv_scores.append(fold_score)
+    # Use SMOTETomek for class imbalance in full training set
+    resampler = SMOTETomek(random_state=42)
+    X_train_res, y_train_res = resampler.fit_resample(X_train, y_train)
     
-    # Calculate mean and standard deviation of CV scores
-    mean_cv_score = np.mean(cv_scores)
-    std_cv_score = np.std(cv_scores)
-    print(f"Cross-validation ROC AUC: {mean_cv_score:.4f} ± {std_cv_score:.4f}")
-    
-    # Split data into train and test
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.3, random_state=42, stratify=y
-    )
-    
-    # Check if we have enough samples for SMOTETomek
-    y_int = y_train.astype(int)
-    counts = np.bincount(y_int)
-    min_samples = min(counts)
-    k_neighbors = min(5, min_samples-1) if min_samples >= 3 else 1
-    
-    # Initialize model with best parameters
-    final_model = initialize_model(model_name, study.best_params)
-    
-    # Create and fit pipeline for final model
-    if min_samples >= 3:
-        print("Applying SMOTETomek for final model training...")
-        pipeline = Pipeline([
-            ('sampling', SMOTETomek(smote=SMOTE(k_neighbors=k_neighbors, random_state=42), random_state=42)),
-            ('model', final_model)
-        ])
-        
-        pipeline.fit(X_train, y_train)
-        
-        # For compatibility with the rest of the code, extract the model
-        final_model = pipeline.named_steps['model']
-    else:
-        print("Not enough samples for SMOTETomek, training model directly...")
-        final_model.fit(X_train, y_train)
-    
-    # Save model
-    model_output = config.MODEL_OUTPUT
-    suffix = '_selected' if selected_features else ''
-    model_path = os.path.join(
-        model_output,
-        f"{model_name}_{score_type.lower()}{suffix}.pkl"
-    )
-    joblib.dump(final_model, model_path)
-    print(f"Model saved to {model_path}")
+    # Fit model on resampled training data
+    best_model.fit(X_train_res, y_train_res)
     
     # Evaluate model
-    evaluate_model(final_model, X_test, y_test, score_type, model_name, selected_features)
+    eval_results = evaluate_model(
+        best_model, 
+        X_test, 
+        y_test, 
+        score_type, 
+        model_name,
+        imputation,
+        feature_selection
+    )
     
-    return final_model, X_test, y_test
+    # Save model
+    paths = config.get_output_paths(imputation, feature_selection)
+    model_dir = os.path.join(paths['models'], model_name, score_type.upper())
+    os.makedirs(model_dir, exist_ok=True)
+    
+    model_path = os.path.join(model_dir, f"{model_name}_model.joblib")
+    joblib.dump(best_model, model_path)
+    print(f"\nModel saved to: {model_path}")
+    
+    # Save hyperparameters
+    hyperparam_path = os.path.join(model_dir, f"{model_name}_hyperparams.joblib")
+    joblib.dump(best_params, hyperparam_path)
+    print(f"Hyperparameters saved to: {hyperparam_path}")
+    
+    # Save evaluation results
+    results_path = os.path.join(model_dir, f"{model_name}_eval_results.joblib")
+    joblib.dump(eval_results, results_path)
+    print(f"Evaluation results saved to: {results_path}")
+    
+    return {
+        'model': best_model,
+        'params': best_params,
+        'eval_results': eval_results
+    }
 
-
-# -----------------------------------------------------------------------------
-# CLI ENTRY
-# -----------------------------------------------------------------------------
 
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(description='Train and optimize models')
+    parser = argparse.ArgumentParser(description='Optimize and train models')
     parser.add_argument('--score_type', type=str, default='FRIED',
-                      choices=['FRIED', 'FRAGIRE18'],
-                      help='Score type to use for model training')
-    parser.add_argument('--model_name', type=str, default='lightgbm',
-                      choices=['lightgbm', 'xgboost', 'catboost', 'randomforest'],
-                      help='Model to use')
+                        help='Score to predict: FRIED or FRAGIRE18')
+    parser.add_argument('--model', type=str, default='lightgbm',
+                        help='Model to use: lightgbm, xgboost, catboost, randomforest')
     parser.add_argument('--n_trials', type=int, default=25,
-                      help='Number of trials for hyperparameter optimization')
-    parser.add_argument('--selected_features', action='store_true',
-                      help='Use only selected important features')
+                        help='Number of trials for Optuna optimization')
+    parser.add_argument('--feature_selection', type=str, default=None,
+                        help='Feature selection method: embedded, wrapper, or None')
+    parser.add_argument('--no_imputation', action='store_true',
+                        help='Use raw data without imputation')
+    
     args = parser.parse_args()
     
+    # Determine if imputation is used
+    imputation = not args.no_imputation
+    
+    # Run optimization
     optimize_model(
-        args.score_type,
-        args.n_trials,
-        args.model_name,
-        args.selected_features
+        score_type=args.score_type,
+        n_trials=args.n_trials,
+        model_name=args.model,
+        imputation=imputation,
+        feature_selection=args.feature_selection
     )

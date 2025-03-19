@@ -296,6 +296,26 @@ def test_imputation():
     
     return imputed_df
 
+
+def process_features(df):
+    """
+    Drop highly correlated features
+    """
+    # Keep track of dropped features
+    dropped_features = []
+    
+    # Drop highly correlated features
+    original_shape = df.shape
+    df = drop_correlated_features(df)
+    
+    # Update dropped features
+    dropped_correlated = original_shape[1] - df.shape[1]
+    if dropped_correlated > 0:
+        dropped_features.append(f"Dropped {dropped_correlated} highly correlated features")
+    
+    return df, dropped_features
+
+
 # Run test if module is run directly
 if __name__ == "__main__":
     test_imputation()
