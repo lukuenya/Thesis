@@ -36,12 +36,23 @@ def load_feature_importances(score_type, imputation=True, feature_selection=None
     output_dir = paths['feature_importances']
     
     for model in models:
+        # Try the CSV format that get_feature_importances.py creates
         filepath = os.path.join(
             output_dir,
-            f"{model}_{score_type.lower()}_feature_importances.xlsx"
+            f"importance_{model}_{score_type.lower()}_classification.csv"
         )
         if os.path.exists(filepath):
-            df = pd.read_excel(filepath)
+            print(f"Loading feature importances from {filepath}")
+            df = pd.read_csv(filepath)
+            # Rename columns if needed to match expected format
+            if 'feature' in df.columns and 'importance' in df.columns:
+                df = df.rename(columns={
+                    'feature': 'Feature',
+                    'importance': 'Importance'
+                })
+                # Add standard deviation column if missing
+                if 'Importance_STD' not in df.columns:
+                    df['Importance_STD'] = df['Importance'] * 0.1  # Default value
             importances[model] = df
     
     return importances

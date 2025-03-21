@@ -1,0 +1,10 @@
+SCORE ICOPE STEP1 REPERAGE GLOBAL
+SCORE FROP COM HORS AMTS SCORE FROPCOM0011
+Variation du poids
+SF36-36
+frequency_dispersion_Power_Spectrum_Density_ML_YF_follow-up
+critical_time_Diffusion_AP_YF_baseline
+DoubleStance_follow-up
+Smo_Ent_AccZWaist_follow-up
+Sym_P1P2_aCC_LB2_follow-up
+leftHandV2_baseline

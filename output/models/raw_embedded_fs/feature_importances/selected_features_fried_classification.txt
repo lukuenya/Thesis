@@ -1,0 +1,58 @@
+FORCEPREHENSION
+EXAMCLIN02
+Sexe
+SPPB06
+SPPB7
+EXAMCLIN01_SQ003_SQ001_
+SF3603_SQ006_
+FRAGIRE CALCUL TEST 3 VITMARCH.
+SCORE TOTAL SPPB
+SCORE FROP COM HORS AMTS SCORE FROPCOM0011
+SF36-Physical functioning
+EPICE000_SQ003_
+Smo_ROM_anML_follow-up
+HHIE01_SQ005_
+SPPB9
+EPICE000_SQ006_
+FRAGIRE CALCUL PONDERATION
+Spr_SwT_L_follow-up
+zero_crossing_SPD_ML_YF_baseline
+Sta_Att_aML_baseline
+Ste_FFTqaML_LB_follow-up
+BMI
+SPPB07 - COTATION
+FROPCOM0027
+Ste_FFTqgCC_LB_follow-up
+zero_crossing_SPD_ML_YO_baseline
+rightHandV1_baseline
+leftHandV2_baseline
+SF3603_SQ001_
+Age a l inclusion
+HADS TOTAL D
+Smo_Ent_GyrYWaist_baseline
+Variation du poids
+leftHandV1_baseline
+critical_time_Diffusion_ML_YF_baseline
+EXAMCLIN023
+Syn_ffT_baseline
+SF3609_SQ007_
+frequency_dispersion_Power_Spectrum_Density_AP_YF_baseline
+Spr_UtrT_baseline
+CycleVariability_baseline
+Ste_cvSwT_R_baseline
+SCORE FROP COM SCREEN
+rightHandV2_baseline
+range_ratio_ML_AND_AP_YF_baseline
+FROPCOM0007_SQ015_
+principal_sway_direction_ML_AND_AP_YF_baseline
+FROPCOM0005
+Ste_cvSwT_L_baseline
+Sta_Lyap_AccZWaist_follow-up
+Sta_Lyap_GyrXWaist_follow-up
+FROPCOM0018
+Sta_Att_aAP_follow-up
+FROPCOM0014
+HHIE01_SQ006_
+Smo_Ent_GyrZWaist_baseline
+Sta_Lyap_AccXWaist_baseline
+SF3611_SQ001_

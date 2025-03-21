@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import numpy as np
+import argparse
 from lightgbm import LGBMClassifier
 from xgboost import XGBClassifier
 from catboost import CatBoostClassifier
@@ -89,7 +90,7 @@ MODEL_PARAMS = {
     }
 }
 
-def get_feature_importances(score_type, model_name):
+def get_feature_importances(score_type, model_name, imputation=True):
     """
     Get feature importances from a model using cross-validation
     
@@ -99,9 +100,13 @@ def get_feature_importances(score_type, model_name):
         Type of score to predict (FRIED or FRAGIRE18)
     model_name : str
         Name of the model to use (lightgbm, xgboost, catboost, or randomforest)
+    imputation : bool
+        Whether to use imputed data or raw data
     """
     # Load data
-    X, y = data_loader.load_data(score_type)
+    X, y = data_loader.load_data(score_type, imputation=imputation)
+    
+    # Note: NaN values are already handled in data_loader.py
     
     # Convert to numpy arrays
     if isinstance(X, pd.DataFrame):
@@ -160,32 +165,34 @@ def get_feature_importances(score_type, model_name):
     # Sort by importance
     importance_df = importance_df.sort_values('importance', ascending=False)
     
+    # Get output paths based on imputation
+    output_paths = config.get_output_paths(imputation=imputation)
+    
     # Create output directory if it doesn't exist
-    os.makedirs(config.FEATURE_IMPORTANCE_DIR, exist_ok=True)
+    os.makedirs(output_paths["feature_importances"], exist_ok=True)
     
     # Save to CSV
     output_file = os.path.join(
-        config.FEATURE_IMPORTANCE_DIR,
+        output_paths["feature_importances"],
         f"importance_{model_name}_{score_type.lower()}_classification.csv"
     )
     importance_df.to_csv(output_file, index=False)
     print(f"Feature importances saved to {output_file}")
     
     # Save top features to a text file
-    top_features = importance_df['feature'].head(50).tolist()
+    top_features = importance_df['feature'].head(100).tolist()
     top_features_file = os.path.join(
-        config.FEATURE_IMPORTANCE_DIR,
+        output_paths["feature_importances"],
         f"selected_features_{score_type.lower()}_classification.txt"
     )
     with open(top_features_file, 'w') as f:
         for feature in top_features:
             f.write(f"{feature}\n")
     
-    print(f"Top 50 features saved to {top_features_file}")
+    print(f"Top 100 features saved to {top_features_file}")
     return importance_df
 
 if __name__ == "__main__":
-    import argparse
     parser = argparse.ArgumentParser(description='Get feature importances from models')
     parser.add_argument('--score_type', type=str, default='FRIED',
                       choices=['FRIED', 'FRAGIRE18'],
@@ -193,6 +200,8 @@ if __name__ == "__main__":
     parser.add_argument('--model_name', type=str, default='lightgbm',
                       choices=['lightgbm', 'xgboost', 'catboost', 'randomforest'],
                       help='Model to use')
+    parser.add_argument('--no_imputation', action='store_true',
+                      help='Use raw data without imputation')
     args = parser.parse_args()
     
-    get_feature_importances(args.score_type, args.model_name)
+    get_feature_importances(args.score_type, args.model_name, imputation=not args.no_imputation)

@@ -111,15 +111,15 @@ All experiments can be reproduced using the provided code:
 2. Run feature importance analysis:
    ```bash
    cd src
-   python get_feature_importances.py --score_type FRIED --model_name [model] --task [task]
-   python get_feature_importances.py --score_type FRAGIRE18 --model_name [model] --task [task]
+   python get_feature_importances.py --score_type FRIED --model_name [model]
+   python get_feature_importances.py --score_type FRAGIRE18 --model_name [model]
    ```
    - Replace `[model]` with: `lightgbm`, `xgboost`, `randomforest` or `catboost`
 
 3. Run feature selection with desired method:
    ```bash
    # Using embedded method (threshold-based)
-   python feature_selection.py --score_type FRIED --method embedded --threshold_percentile 20
+   python feature_selection.py --score_type FRIED --method embedded --threshold 20
    
    # Using wrapper method with specific number of features
    python feature_selection.py --score_type FRIED --method wrapper --n_features 10

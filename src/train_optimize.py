@@ -252,7 +252,7 @@ def get_hyperparameter_space(trial, model_name):
     if model_name == 'lightgbm':
         return {
             'n_estimators': trial.suggest_int('n_estimators', 50, 500),
-            'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3),
+            'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.1),
             'num_leaves': trial.suggest_int('num_leaves', 20, 100),
             'max_depth': trial.suggest_int('max_depth', 3, 10),
             'min_data_in_leaf': trial.suggest_int('min_data_in_leaf', 10, 50),
@@ -266,7 +266,7 @@ def get_hyperparameter_space(trial, model_name):
     elif model_name == 'xgboost':
         return {
             'n_estimators': trial.suggest_int('n_estimators', 50, 500),
-            'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3),
+            'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.1),
             'max_depth': trial.suggest_int('max_depth', 3, 10),
             'min_child_weight': trial.suggest_float('min_child_weight', 1e-3, 10.0, log=True),
             'subsample': trial.suggest_float('subsample', 0.6, 1.0),
@@ -278,7 +278,7 @@ def get_hyperparameter_space(trial, model_name):
     elif model_name == 'catboost':
         return {
             'iterations': trial.suggest_int('iterations', 50, 500),
-            'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3),
+            'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.1),
             'depth': trial.suggest_int('depth', 3, 10),
             'l2_leaf_reg': trial.suggest_float('l2_leaf_reg', 1e-8, 10.0, log=True),
             'random_strength': trial.suggest_float('random_strength', 1e-8, 10.0, log=True),
@@ -287,7 +287,7 @@ def get_hyperparameter_space(trial, model_name):
         }
     elif model_name == 'randomforest':
         return {
-            'n_estimators': trial.suggest_int('n_estimators', 50, 300),
+            'n_estimators': trial.suggest_int('n_estimators', 50, 500),
             'max_depth': trial.suggest_int('max_depth', 3, 15),
             'min_samples_split': trial.suggest_int('min_samples_split', 2, 20),
             'min_samples_leaf': trial.suggest_int('min_samples_leaf', 1, 10),
@@ -448,7 +448,7 @@ if __name__ == "__main__":
                         help='Score to predict: FRIED or FRAGIRE18')
     parser.add_argument('--model', type=str, default='lightgbm',
                         help='Model to use: lightgbm, xgboost, catboost, randomforest')
-    parser.add_argument('--n_trials', type=int, default=25,
+    parser.add_argument('--n_trials', type=int, default=50,
                         help='Number of trials for Optuna optimization')
     parser.add_argument('--feature_selection', type=str, default=None,
                         help='Feature selection method: embedded, wrapper, or None')

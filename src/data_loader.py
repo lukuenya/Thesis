@@ -5,6 +5,7 @@ import numpy as np
 import config
 import preprocessing
 import os
+import feature_selection
 
 def load_data(target_score='FRIED', selected_features=False, imputation=True, feature_selection_method=None, n_features=10, threshold_percentile=20):
     """
@@ -40,23 +41,28 @@ def load_data(target_score='FRIED', selected_features=False, imputation=True, fe
     # Get target for classification
     target_name = config.TARGET_COLUMNS_DICT[target_score]['classification']
     
-    # Preprocess features
-    if imputation:
-        X = preprocessing.process_features(df)
-    else:
-        print("Using raw data without imputation")
-        # Preprocess without imputation
-        X = preprocessing.process_features(df, impute=False)
-    
-    # Get target
+    # Get target before preprocessing (to avoid it being dropped)
     y = df[target_name]
     
-    # Feature selection
+    # Remove rows with NaN in target
+    valid_idx = ~y.isna()
+    df = df[valid_idx]
+    y = y[valid_idx]
+    print(f"Dropped {(~valid_idx).sum()} rows with NaN in target")
+    
+    # Preprocess features
+    X = preprocessing.process_features(df, impute=imputation)
+    
+    # Feature selection - priority order:
+    # 1. If selected_features=True: use pre-saved features file
+    # 2. If feature_selection_method is provided: apply that method on the fly
+    # 3. Otherwise: use all features
+    
     if selected_features:
         # Get output paths based on imputation and feature selection state
         paths = config.get_output_paths(
             imputation=imputation, 
-            feature_selection=feature_selection_method if feature_selection_method else "embedded"
+            feature_selection="embedded"
         )
         output_dir = paths['feature_importances']
         
@@ -77,32 +83,59 @@ def load_data(target_score='FRIED', selected_features=False, imputation=True, fe
             print(f"Loaded {len(selected_feature_names)} pre-selected features from {filepath}")
             X = X[selected_feature_names]
         else:
-            print(f"Warning: No pre-selected features found at {filepath}")
+            print(f"Warning: No pre-selected features found at {filepath}.")
     
-    # Apply feature selection on-the-fly
-    elif feature_selection_method == 'embedded':
-        # Load feature importances for all models
-        importances = feature_selection.load_feature_importances(target_score, imputation)
-        
-        if not importances:
-            print("Warning: No feature importance files found. Using all features.")
-        else:
-            # Aggregate importance scores across models
-            agg_importance = feature_selection.aggregate_feature_importance(importances)
-            
-            # Select top features
-            selected_feature_names = feature_selection.select_top_features(agg_importance, threshold_percentile)
-            print(f"Selected {len(selected_feature_names)} features using embedded method")
-            
-            # Filter features
-            X = X[selected_feature_names]
-            
-    elif feature_selection_method == 'wrapper':
-        # Perform wrapper-based feature selection
-        selected_feature_names, _ = feature_selection.wrapper_feature_selection(
-            X, y, n_features=n_features
+    elif feature_selection_method:
+        # Feature selection path is priority
+        # Get output paths based on imputation and feature selection state
+        paths = config.get_output_paths(
+            imputation=imputation, 
+            feature_selection=feature_selection_method
         )
-        X = X[selected_feature_names]
+        output_dir = paths['feature_importances']
+        
+        # Construct prefix for filename
+        prefix = ""
+        if feature_selection_method == "wrapper":
+            prefix = "wrapper_"
+            
+        # Load selected features from file
+        filepath = os.path.join(
+            output_dir,
+            f"{prefix}selected_features_{target_score.lower()}_classification.txt"
+        )
+        
+        if os.path.exists(filepath):
+            with open(filepath, 'r') as f:
+                selected_feature_names = [line.strip() for line in f]
+            print(f"Loaded {len(selected_feature_names)} pre-selected features from {filepath}")
+            X = X[selected_feature_names]
+        else:
+            print(f"Warning: No pre-selected features found at {filepath}. Calculating on the fly.")
+            # Apply feature selection on-the-fly only if file doesn't exist
+            if feature_selection_method == 'embedded':
+                # Load feature importances for all models
+                importances = feature_selection.load_feature_importances(target_score, imputation)
+                
+                if not importances:
+                    print("Warning: No feature importance files found. Using all features.")
+                else:
+                    # Aggregate importance scores across models
+                    agg_importance = feature_selection.aggregate_feature_importance(importances)
+                    
+                    # Select top features
+                    selected_feature_names = feature_selection.select_top_features(agg_importance, threshold_percentile)
+                    print(f"Selected {len(selected_feature_names)} features using embedded method")
+                    
+                    # Filter features
+                    X = X[selected_feature_names]
+                    
+            elif feature_selection_method == 'wrapper':
+                # Perform wrapper-based feature selection
+                selected_feature_names, _ = feature_selection.wrapper_feature_selection(
+                    X, y, n_features=n_features
+                )
+                X = X[selected_feature_names]
     
     return X, y
 

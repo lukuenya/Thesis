@@ -244,6 +244,76 @@ def process_imputation(X, n_splits=5, k_values=[3, 5, 7, 10], verbose=False):
     return X_imputed.values, best_k
 
 
+def process_features(df, impute=True):
+    """
+    Process features for modeling:
+    - Drop specified columns from config
+    - Drop highly correlated features
+    - Apply imputation if required
+    
+    Parameters:
+    -----------
+    df : pd.DataFrame
+        Raw data
+    impute : bool
+        Whether to apply imputation
+        
+    Returns:
+    --------
+    df : pd.DataFrame
+        Processed data
+    """
+    # Keep track of dropped features
+    dropped_features = []
+    
+    # First drop config-specified columns to remove
+    original_cols = df.columns.tolist()
+    
+    # Drop columns specified in config
+    import config
+    for col in config.COLS_TO_DROP_FRAGIRE18_FRIED:
+        if col in df.columns:
+            df = df.drop(columns=[col])
+    
+    # # Also drop any columns matching wildcard pattern
+    # import fnmatch
+    # pattern_cols = [col for col in df.columns if any(fnmatch.fnmatch(col, pattern) 
+    #                                               for pattern in ["*_follow-up"])]
+    # if pattern_cols:
+    #     df = df.drop(columns=pattern_cols)
+    
+    # Update dropped features list
+    dropped_config = len(original_cols) - df.shape[1]
+    if dropped_config > 0:
+        dropped_features.append(f"Dropped {dropped_config} columns specified in config")
+    
+    # Drop highly correlated features
+    original_shape = df.shape
+    df = drop_correlated_features(df)
+    
+    # Update dropped features
+    dropped_correlated = original_shape[1] - df.shape[1]
+    if dropped_correlated > 0:
+        dropped_features.append(f"Dropped {dropped_correlated} highly correlated features")
+    
+    # Apply imputation if requested
+    if impute:
+        # Convert to DataFrame if numpy array
+        if isinstance(df, np.ndarray):
+            df = pd.DataFrame(df)
+            
+        # Apply imputation
+        imputed_data, best_k = process_imputation(df)
+        if isinstance(imputed_data, np.ndarray):
+            df = pd.DataFrame(imputed_data, columns=df.columns)
+        else:
+            df = imputed_data
+            
+        dropped_features.append(f"Applied KNN imputation with k={best_k}")
+    
+    return df
+
+
 def test_imputation():
     """
     Test imputation on different variable types in random positions
@@ -295,25 +365,6 @@ def test_imputation():
             print(f"✓ {col}: Continuous values properly imputed")
     
     return imputed_df
-
-
-def process_features(df):
-    """
-    Drop highly correlated features
-    """
-    # Keep track of dropped features
-    dropped_features = []
-    
-    # Drop highly correlated features
-    original_shape = df.shape
-    df = drop_correlated_features(df)
-    
-    # Update dropped features
-    dropped_correlated = original_shape[1] - df.shape[1]
-    if dropped_correlated > 0:
-        dropped_features.append(f"Dropped {dropped_correlated} highly correlated features")
-    
-    return df, dropped_features
 
 
 # Run test if module is run directly

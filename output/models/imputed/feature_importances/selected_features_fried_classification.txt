@@ -1,0 +1,100 @@
+FORCEPREHENSION
+SF36-Physical functioning
+rightHandV1_baseline
+SPPB06
+Sexe
+SCORE TOTAL SPPB
+leftHandV2_baseline
+Ste_FFTqaML_LB_follow-up
+EXAMCLIN01_SQ003_SQ001_
+Sta_Att_aAP_follow-up
+Ste_FFTqaCC_LB_follow-up
+rightHandV2_baseline
+SPPB7
+Sta_Att_aAP_baseline
+AvgSpeed_follow-up
+Sta_Att_gML_follow-up
+DoubleStance_follow-up
+MNAEVALGLOBALESCORE
+EXAMCLIN02
+rightHandV1_follow-up
+Sta_ROM_lML_follow-up
+Ste_FFTqgCC_LB_follow-up
+SF3609_SQ007_
+FROPCOM0027
+Ste_FFTqgML_LB_baseline
+Smo_Ent_GyrZWaist_follow-up
+SCORE FROP COM HORS AMTS SCORE FROPCOM0011
+FRAGIRE CALCUL TEST 3 VITMARCH.
+CycleVariability_baseline
+rightHandV2_follow-up
+Smo_Ent_GyrZWaist_baseline
+AvgSpeed_baseline
+SPPB9
+Ste_FFTqaAP_LB_follow-up
+Ste_cvSwT_L_follow-up
+leftHandV1_baseline
+Ste_FFTqgAP_LB_follow-up
+Sta_Att_aML_follow-up
+SF3603_SQ006_
+SF3603_SQ003_
+ICOPE LOCOMOTION LEVER DE CHAISE NEGATIF
+HADS TOTAL D
+Sta_Lyap_GyrZWaist_baseline
+coefficient_sway_direction_ML_AND_AP_YF_follow-up
+MeanStepDuration_follow-up
+Sta_Lyap_AccXWaist_follow-up
+Ste_P2_aCC_LB2_follow-up
+CycleVariability_follow-up
+SF36-General health
+zero_crossing_SPD_ML_YO_baseline
+long_time_scaling_Diffusion_ML_YF_follow-up
+Ste_FFTqgML_LB_follow-up
+Ste_FFTqaAP_LB_baseline
+SF3603_SQ001_
+HADS005
+SF3609_SQ008_
+critical_time_Diffusion_ML_YF_follow-up
+Smo_ROM_anML_baseline
+Sta_RMS_gAP_LB_follow-up
+Sta_Lyap_AccZWaist_baseline
+Syn_ffT_baseline
+HADS TOTAL A
+SF36-29
+mean_frequency_ML_YO_baseline
+Sta_Lyap_GyrZWaist_follow-up
+Sta_Att_aML_baseline
+Sta_RMS_gAP_LB_baseline
+Sta_Att_gCC_follow-up
+Sta_Lyap_GyrYWaist_baseline
+Sta_Att_gCC_baseline
+Smo_Ent_AccYWaist_baseline
+Sta_Att_gAP_follow-up
+zero_crossing_SPD_ML_YF_baseline
+SPPB09 - COTATION
+S36-Energy_fatigue
+Sta_RMS_aML_LB_baseline
+BMI
+SF3603_SQ004_
+Ste_FFTqaCC_LB_baseline
+SF36-Pain
+Smo_Ent_GyrXWaist_baseline
+FRAGIRE CALCUL PONDERATION
+MNASCORETOTAL
+DoubleStance_baseline
+Sta_ROM_lML_baseline
+mean_frequency_ML_YF_baseline
+short_time_scaling_Diffusion_ML_YO_baseline
+long_time_scaling_Diffusion_AP_YO_follow-up
+Spr_UtrT_baseline
+SCORE ICOPE STEP1 REPERAGE GLOBAL
+Age a l inclusion
+short_time_scaling_Diffusion_AP_YF_follow-up
+Smo_ROM_anML_follow-up
+MFESCALE Dimension activites d interieur items_1_9
+Ste_cvT_follow-up
+Sta_Lyap_GyrYWaist_follow-up
+mean_frequency_ML_YF_follow-up
+mean_frequency_ML_YO_follow-up
+SCORE FROP COM SCREEN
+frequency_dispersion_Power_Spectrum_Density_ML_YO_follow-up

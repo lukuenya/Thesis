@@ -1,0 +1,58 @@
+FORCEPREHENSION
+EXAMCLIN02
+Sexe
+SF36-Physical functioning
+DoubleStance_follow-up
+SPPB06
+EXAMCLIN01_SQ003_SQ001_
+Sta_Att_aAP_baseline
+Ste_FFTqaCC_LB_follow-up
+rightHandV1_baseline
+SPPB7
+leftHandV2_baseline
+Smo_Ent_GyrZWaist_follow-up
+SCORE FROP COM HORS AMTS SCORE FROPCOM0011
+SCORE TOTAL SPPB
+Sta_Lyap_AccZWaist_baseline
+Sta_Lyap_AccZWaist_follow-up
+FRAGIRE CALCUL TEST 3 VITMARCH.
+Ste_FFTqaML_LB_follow-up
+Sta_Att_aAP_follow-up
+leftHandV1_baseline
+MNAEVALGLOBALESCORE
+SF3609_SQ007_
+Spr_UtrT_baseline
+CycleVariability_baseline
+Ste_FFTqgCC_LB_follow-up
+zero_crossing_SPD_ML_YF_baseline
+FROPCOM0027
+Sta_Lyap_AccYWaist_follow-up
+Sta_ROM_lML_follow-up
+zero_crossing_SPD_ML_YO_baseline
+Sta_Att_gML_follow-up
+Sta_Lyap_AccXWaist_follow-up
+Syn_ffT_baseline
+rightHandV2_baseline
+SF36-General health
+AvgSpeed_follow-up
+MeanStepDuration_follow-up
+Ste_FFTqgML_LB_baseline
+FROPCOM0006_S4_
+FROPCOM0007_SQ015_
+rightHandV1_follow-up
+Smo_Ent_GyrZWaist_baseline
+Sym_HRaCC_LB_baseline
+AvgSpeed_baseline
+HHIE01_SQ004_
+mean_value_ML_YF_follow-up
+Smo_Ent_AccXWaist_baseline
+Sta_Att_gCC_baseline
+MMSE08SCORETOTAL
+power_frequency_95_Power_Spectrum_Density_ML_YF_follow-up
+coefficient_sway_direction_ML_AND_AP_YF_follow-up
+SPPB9
+CycleVariability_follow-up
+Ste_FFTqaAP_LB_baseline
+frequency_dispersion_Power_Spectrum_Density_AP_YF_baseline
+long_time_scaling_Diffusion_ML_YF_follow-up
+SF36-Pain

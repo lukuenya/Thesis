@@ -1,0 +1,10 @@
+Sexe
+EXAMCLIN01_SQ001_SQ001_
+EXAMCLIN02
+FORCEPREHENSION
+SPPB7
+mean_value_ML_YF_follow-up
+critical_time_Diffusion_ML_YO_follow-up
+AvgSpeed_follow-up
+Sta_Att_aAP_baseline
+Ste_FFTqaML_LB_follow-up

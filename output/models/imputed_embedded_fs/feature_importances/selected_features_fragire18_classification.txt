@@ -1,0 +1,58 @@
+LFS_ML_AND_AP_YF_baseline
+SCORE FROP COM HORS AMTS SCORE FROPCOM0011
+DoubleStance_follow-up
+Variation du poids
+Sta_Att_gAP_follow-up
+SF36-36
+Sta_RMS_gAP_LB_follow-up
+Sta_Att_gAP_baseline
+frequency_dispersion_Power_Spectrum_Density_ML_YF_follow-up
+long_time_diffusion_Diffusion_AP_YF_follow-up
+range_ratio_ML_AND_AP_YF_baseline
+frequency_mode_Power_Spectrum_Density_ML_YF_follow-up
+RoliTronc_follow-up
+SF3611_SQ004_
+Ste_P2_aAP_LB2_follow-up
+Score_YO_baseline
+HHIE02
+SCORE EPICE GLOBAL
+FRAGIRE17
+Sta_ROM_lML_baseline
+mean_velocity_ML_YF_follow-up
+Sta_Lyap_GyrXWaist_baseline
+long_time_scaling_Diffusion_AP_YO_follow-up
+Sym_HRaCC_LB_baseline
+Sta_Lyap_AccZWaist_baseline
+Ste_P2_aAP_LB2_baseline
+Sta_Lyap_GyrYWaist_follow-up
+critical_time_Diffusion_AP_YF_baseline
+short_time_scaling_Diffusion_ML_YO_follow-up
+Sym_P1P2_aCC_LB2_follow-up
+zero_crossing_SPD_AP_YO_baseline
+Sta_Lyap_AccXWaist_follow-up
+mean_frequency_ML_YF_baseline
+Sta_Att_aAP_baseline
+leftHandV2_baseline
+FRAGIRE CALCUL PONDERATION
+SwingMeanStrideDuration_baseline
+Smo_Ent_AccZWaist_follow-up
+long_time_scaling_Diffusion_AP_YF_follow-up
+total_power_Power_Spectrum_Density_AP_YF_follow-up
+Sta_Att_aAP_follow-up
+Sym_HRaAP_LB_follow-up
+SPPB06
+SF36-Pain
+Ste_FFTqaCC_LB_baseline
+maximal_distance_ML_YO_follow-up
+frequency_mode_Power_Spectrum_Density_ML_YF_baseline
+SCORE TOTAL SPPB
+mean_distance_AP_YO_follow-up
+long_time_scaling_Diffusion_ML_YO_follow-up
+Sta_Lyap_GyrZWaist_baseline
+Stu_RMS_aCCF_follow-up
+Sway_Density_YF_baseline
+power_frequency_50_Power_Spectrum_Density_ML_YF_follow-up
+Ste_FFTqgAP_LB_follow-up
+Sym_HRaCC_LB_follow-up
+Ste_FFTqaAP_LB_follow-up
+AvgSpeed_follow-up
