@@ -124,7 +124,7 @@ All experiments can be reproduced using the provided code:
    # Using wrapper method with specific number of features
    python feature_selection.py --score_type FRIED --method wrapper --n_features 10
    
-   # Without imputation (using raw data)
+   # Without imputation (RF model does not handle missing values)
    python feature_selection.py --score_type FRIED --method wrapper --n_features 10 --no_imputation
    ```
 
@@ -139,7 +139,7 @@ All experiments can be reproduced using the provided code:
    # Using all features (no feature selection)
    python train_optimize.py --score_type FRIED --model [model] --no_feature_selection
    
-   # Without imputation
+   # Without imputation (RF model does not handle missing values)
    python train_optimize.py --score_type FRIED --model [model] --no_imputation
    ```
 
